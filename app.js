@@ -20,6 +20,7 @@ const state = {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),   // 0-11
     weekStart: null,                // lunedì della settimana visibile 'YYYY-MM-DD'
+    view: 'settimana',              // 'mese' | 'settimana' | 'giorno'
     selDate: null,                  // 'YYYY-MM-DD'
     filterMember: 'all',            // 'all' o member.id
     events: [],                     // eventi caricati
@@ -349,46 +350,68 @@ function renderHome(){
 }
 
 // dati di oggi per gli statepill: eventi lavoro + orari attivi - vacanze
-const todayState = { flightMembers:new Set(), schoolMembers:new Set(), loaded:false };
+const todayState = { flightMembers:new Set(), schoolMembers:new Set(), activityMembers:new Map(), loaded:false };
 async function loadTodayStates(){
   const today = todayYmd();
+  const now = new Date();
+  const nowMin = now.getHours()*60 + now.getMinutes();
   const weekday = (()=>{ let d=new Date(today+'T12:00:00').getDay(); return d===0?7:d; })();
 
-  // chi ha un evento "lavoro" oggi (volo)
-  const { data: evs } = await sb.from('events').select('member_id,category,start_at')
+  // chi è IN VOLO ADESSO (evento lavoro che copre l'ora attuale)
+  const { data: evs } = await sb.from('events').select('member_id,category,start_at,end_at')
     .eq('household_id', state.household.id).eq('category','lavoro')
     .gte('start_at', today+'T00:00:00').lt('start_at', today+'T23:59:59');
-  todayState.flightMembers = new Set((evs||[]).map(e=>e.member_id).filter(Boolean));
+  todayState.flightMembers = new Set((evs||[]).filter(e=>{
+    if(!e.member_id) return false;
+    const s = e.start_at ? toMin(e.start_at.slice(11,16)) : null;
+    const en = e.end_at ? toMin(e.end_at.slice(11,16)) : (s!=null ? s+120 : null);
+    if(s==null) return false;
+    return nowMin>=s && nowMin<=en;
+  }).map(e=>e.member_id));
 
-  // chi ha scuola/attività oggi (member_schedules per weekday) e NON è in vacanza
+  // orari di oggi (scuola/attività) attivi ADESSO, escludendo chi è in vacanza
   const memberIds = state.members.map(m=>m.id);
-  const { data: scheds } = await sb.from('member_schedules').select('member_id,weekday,label,active')
+  const { data: scheds } = await sb.from('member_schedules').select('member_id,weekday,label,active,start_time,end_time')
     .in('member_id', memberIds).eq('weekday', weekday).eq('active', true);
   const { data: excs } = await sb.from('schedule_exceptions').select('member_id,start_date,end_date')
     .in('member_id', memberIds).lte('start_date', today).gte('end_date', today);
   const inVacanza = new Set((excs||[]).map(e=>e.member_id));
-  todayState.schoolMembers = new Set((scheds||[])
-    .filter(s=>/scuola/i.test(s.label||'') && !inVacanza.has(s.member_id))
-    .map(s=>s.member_id));
+
+  todayState.schoolMembers = new Set();
+  todayState.activityMembers = new Map();
+  (scheds||[]).forEach(s=>{
+    if(inVacanza.has(s.member_id)) return;
+    // se ha orario, controlla la fascia; se non ha orario, considera "tutto il giorno"
+    const st = s.start_time ? toMin(s.start_time.slice(0,5)) : 0;
+    const en = s.end_time ? toMin(s.end_time.slice(0,5)) : 1440;
+    if(nowMin < st || nowMin > en) return; // fuori orario → non attivo ora
+    if(/scuola/i.test(s.label||'')){
+      todayState.schoolMembers.add(s.member_id);
+    } else {
+      todayState.activityMembers.set(s.member_id, (s.label||'Attività').toUpperCase());
+    }
+  });
 
   todayState.loaded = true;
-  renderHomeMembersOnly(); // ridisegna con gli stati veri
+  renderHomeMembersOnly();
 }
 
-// statepill: usa i dati reali di oggi se disponibili, altrimenti fallback su occupazione
+function toMin(hhmm){ if(!hhmm) return 0; const [h,m]=hhmm.split(':').map(Number); return h*60+(m||0); }
+
+// statepill: usa i dati reali di ADESSO se disponibili, altrimenti CASA
 function memberState(m){
   if(m.is_expected) return { t:'ATTESA', c:'#22b8a6' };
   if(todayState.loaded){
     if(todayState.flightMembers.has(m.id)) return { t:'IN VOLO', c:'#5b6cff' };
     if(todayState.schoolMembers.has(m.id)) return { t:'SCUOLA', c:'#ffaa3c' };
+    if(todayState.activityMembers.has(m.id)) return { t:todayState.activityMembers.get(m.id), c:'#9d7bff' };
+    // tutto caricato ma nessuna attività in corso → a casa
+    return { t:'CASA', c:'#7a85a8' };
   }
+  // fallback prima del caricamento dati
   switch(m.occupation){
     case 'cabin_crew': return { t:'CASA', c:'#5b6cff' };
-    case 'nido':
-    case 'materna':
-    case 'elementari':
-    case 'medie': return todayState.loaded ? { t:'CASA', c:'#7a85a8' } : { t:'SCUOLA', c:'#ffaa3c' };
-    case 'lavoro': return { t:'LAVORO', c:'#9d7bff' };
+    case 'lavoro': return { t:'CASA', c:'#9d7bff' };
     default: return { t:'CASA', c:'#7a85a8' };
   }
 }

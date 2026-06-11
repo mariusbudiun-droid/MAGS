@@ -111,6 +111,12 @@
       <div class="sub on" id="cal-agenda">
         <div class="filter" id="cal-filter"></div>
 
+        <div class="viewseg" id="cal-viewseg">
+          <button class="vseg-opt" data-view="mese">Mese</button>
+          <button class="vseg-opt on" data-view="settimana">Settimana</button>
+          <button class="vseg-opt" data-view="giorno">Giorno</button>
+        </div>
+
         <div class="legend" style="margin:0 2px 12px;">
           <span><i style="background:var(--accent)"></i>Lavoro</span>
           <span><i style="background:#ffaa3c"></i>Scuola</span>
@@ -124,6 +130,7 @@
           <button class="cal-nav" id="cal-next">›</button>
         </div>
         <div class="week" id="cal-week"></div>
+        <div class="monthgrid hidden" id="cal-month"></div>
 
         <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
         <div class="card" id="cal-events" style="padding:6px 16px;"></div>

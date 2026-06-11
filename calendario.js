@@ -13,10 +13,72 @@ function todayYmd(){ const n=new Date(); return ymd(n.getFullYear(), n.getMonth(
 async function openCalendar(){
   if(!state.cal.selDate) state.cal.selDate = todayYmd();
   if(!state.cal.weekStart) state.cal.weekStart = mondayOf(state.cal.selDate);
+  if(!state.cal.view) state.cal.view = 'settimana';
   renderCalFilter();
-  await loadWeekEvents();
-  renderWeek();
+  applyCalView();
+}
+
+// applica la vista corrente (mese/settimana/giorno)
+async function applyCalView(){
+  const v = state.cal.view;
+  // toggle pulsanti
+  document.querySelectorAll('#cal-viewseg .vseg-opt').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
+  // mostra/nascondi contenitori
+  $('cal-week').classList.toggle('hidden', v!=='settimana');
+  $('cal-month').classList.toggle('hidden', v!=='mese');
+  if(v==='mese'){
+    await loadMonthEventsCal();
+    renderMonth();
+  } else if(v==='settimana'){
+    await loadWeekEvents();
+    renderWeek();
+  } else { // giorno
+    await loadWeekEvents();
+    const sel=new Date(state.cal.selDate+'T12:00:00');
+    $('cal-title').innerHTML = `${MONTHS_IT[sel.getMonth()].charAt(0).toUpperCase()+MONTHS_IT[sel.getMonth()].slice(1)} <span class="nm">${sel.getFullYear()}</span>`;
+    const lbl = sel.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
+    $('cal-weeklabel').textContent = lbl.charAt(0).toUpperCase()+lbl.slice(1);
+  }
   renderDayAgenda();
+}
+
+// carica eventi del mese (per la vista mese)
+async function loadMonthEventsCal(){
+  const sel = new Date(state.cal.selDate+'T12:00:00');
+  const y=sel.getFullYear(), mo=sel.getMonth();
+  const start = `${y}-${pad(mo+1)}-01`;
+  const endDate = new Date(y, mo+1, 1);
+  const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-01`;
+  const { data } = await sb.from('events').select('*')
+    .eq('household_id', state.household.id)
+    .gte('start_at', start+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at');
+  state.cal.events = data||[];
+}
+
+function renderMonth(){
+  const sel = new Date(state.cal.selDate+'T12:00:00');
+  const y=sel.getFullYear(), mo=sel.getMonth();
+  $('cal-title').innerHTML = `${MONTHS_IT[mo].charAt(0).toUpperCase()+MONTHS_IT[mo].slice(1)} <span class="nm">${y}</span>`;
+  $('cal-weeklabel').textContent = `${MONTHS_IT[mo].charAt(0).toUpperCase()+MONTHS_IT[mo].slice(1)} ${y}`;
+
+  const grid=$('cal-month'); grid.innerHTML='';
+  DOW_IT.forEach(d=>{ const e=document.createElement('div'); e.className='mg-dow'; e.textContent=d; grid.appendChild(e); });
+  const first=new Date(y,mo,1);
+  let startDow=first.getDay(); startDow=(startDow===0)?6:startDow-1;
+  const daysInMonth=new Date(y,mo+1,0).getDate();
+  for(let i=0;i<startDow;i++){ const e=document.createElement('div'); e.className='mg-cell empty'; grid.appendChild(e); }
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr=ymd(y,mo,d);
+    const cell=document.createElement('div'); cell.className='mg-cell';
+    if(dateStr===todayYmd()) cell.classList.add('today');
+    if(dateStr===state.cal.selDate) cell.classList.add('sel');
+    const evs=eventsForDay(dateStr);
+    const cats=[...new Set(evs.map(e=>e.category))].slice(0,4);
+    const pips=cats.map(c=>`<span class="mg-pip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
+    cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-pips">${pips}</span>`;
+    cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
+    grid.appendChild(cell);
+  }
 }
 
 // lunedì della settimana che contiene dateStr
@@ -37,7 +99,7 @@ function renderCalFilter(){
     const p=document.createElement('div');
     p.className='fpill'+(state.cal.filterMember===id?' on':'');
     p.textContent=label;
-    p.onclick=()=>{ state.cal.filterMember=id; renderCalFilter(); renderWeek(); renderDayAgenda(); };
+    p.onclick=()=>{ state.cal.filterMember=id; renderCalFilter(); if(state.cal.view==='mese') renderMonth(); else if(state.cal.view==='settimana') renderWeek(); renderDayAgenda(); };
     wrap.appendChild(p);
   };
   mk('all','Tutti');
@@ -117,13 +179,31 @@ function renderDayAgenda(){
 }
 
 // nav settimane
-$('cal-prev').addEventListener('click', async ()=>{
-  state.cal.weekStart = addDays(state.cal.weekStart, -7);
-  await loadWeekEvents(); renderWeek(); renderDayAgenda();
-});
-$('cal-next').addEventListener('click', async ()=>{
-  state.cal.weekStart = addDays(state.cal.weekStart, 7);
-  await loadWeekEvents(); renderWeek(); renderDayAgenda();
+function calNavigate(dir){
+  const v = state.cal.view;
+  if(v==='mese'){
+    const sel=new Date(state.cal.selDate+'T12:00:00');
+    sel.setMonth(sel.getMonth()+dir);
+    state.cal.selDate = ymd(sel.getFullYear(), sel.getMonth(), Math.min(sel.getDate(), new Date(sel.getFullYear(),sel.getMonth()+1,0).getDate()));
+  } else if(v==='settimana'){
+    state.cal.weekStart = addDays(state.cal.weekStart, dir*7);
+    state.cal.selDate = state.cal.weekStart;
+  } else { // giorno
+    state.cal.selDate = addDays(state.cal.selDate, dir);
+    state.cal.weekStart = mondayOf(state.cal.selDate);
+  }
+  applyCalView();
+}
+$('cal-prev').addEventListener('click', ()=>calNavigate(-1));
+$('cal-next').addEventListener('click', ()=>calNavigate(1));
+
+// selettore vista
+document.querySelectorAll('#cal-viewseg .vseg-opt').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state.cal.view = b.dataset.view;
+    if(state.cal.view==='settimana') state.cal.weekStart = mondayOf(state.cal.selDate);
+    applyCalView();
+  });
 });
 
 // ---- modal evento ----
@@ -193,7 +273,7 @@ $('ev-save').addEventListener('click', async ()=>{
   // porta la vista alla settimana dell'evento e seleziona il giorno
   state.cal.selDate = date;
   state.cal.weekStart = mondayOf(date);
-  await loadWeekEvents(); renderWeek(); renderDayAgenda();
+  await applyCalView();
 });
 
 $('ev-delete').addEventListener('click', async ()=>{
@@ -201,7 +281,7 @@ $('ev-delete').addEventListener('click', async ()=>{
   const { error } = await sb.from('events').delete().eq('id', editingEventId);
   if(error){ showError('ev-error','Errore: '+error.message); return; }
   closeEventModal();
-  await loadWeekEvents(); renderWeek(); renderDayAgenda();
+  await applyCalView();
 });
 
 // ============================================================
@@ -261,9 +341,11 @@ $('roster-file').addEventListener('change', async (e)=>{
       setRosterStatus('err', data.error || 'Import non riuscito. Riprova.');
       return;
     }
-    rosterDays = (data.days||[]).filter(d=>d.type==='flight' && Array.isArray(d.flights) && d.flights.length);
+    // tieni i giorni con un'attività vera: voli, standby, duty, ferie...
+    // scarta solo gli OFF (riposi) che non sono impegni
+    rosterDays = (data.days||[]).filter(d=> d.type && d.type!=='off');
     if(rosterDays.length===0){
-      setRosterStatus('err','Nessun giorno di volo trovato nello screenshot.');
+      setRosterStatus('err','Nessun impegno trovato nello screenshot.');
       return;
     }
     clearRosterStatus();
@@ -286,20 +368,50 @@ function fileToBase64(file){
 function setRosterStatus(kind,msg){ $('roster-status').innerHTML=`<div class="roster-msg ${kind}">${msg}</div>`; }
 function clearRosterStatus(){ $('roster-status').innerHTML=''; }
 
+// descrizione leggibile di un giorno di roster
+const DUTY_LABELS = {
+  flight:'Volo', hsby:'Standby casa', ad:'Standby aeroporto', off:'Riposo',
+  al:'Ferie', vto:'VTO', sick:'Malattia', ul:'Permesso', pl:'Permesso'
+};
+function dutyDescription(d){
+  if(d.type==='flight' && Array.isArray(d.flights) && d.flights.length){
+    return d.flights.map(f=>`${f.from}→${f.to}`).join(' · ');
+  }
+  return DUTY_LABELS[d.type] || (d.assignment||'Duty');
+}
+function dutyTimes(d){
+  // ritorna {dep, arr} in locale per voli, o hsbyStart/End per standby
+  if(d.type==='flight' && d.flights?.length){
+    const primo=d.flights[0], ultimo=d.flights[d.flights.length-1];
+    return {
+      start: primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : null,
+      end: ultimo?.arr ? utcToLocalHHMM(ultimo.arr, d.date) : null,
+    };
+  }
+  if(d.hsbyStart || d.hsbyEnd){
+    return {
+      start: d.hsbyStart ? utcToLocalHHMM(d.hsbyStart, d.date) : null,
+      end: d.hsbyEnd ? utcToLocalHHMM(d.hsbyEnd, d.date) : null,
+    };
+  }
+  return { start:null, end:null };
+}
+
 function renderRosterPreview(){
   const wrap=$('roster-preview');
-  let html=`<div class="sec-row"><h2>Voli trovati: ${rosterDays.length} giorni</h2></div><div class="card" style="padding:6px 16px;">`;
+  let html=`<div class="sec-row"><h2>Trovati: ${rosterDays.length} giorni</h2></div><div class="card" style="padding:6px 16px;">`;
   rosterDays.forEach(d=>{
     const dLabel = new Date(d.date+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
-    const tratte = d.flights.map(f=>`${f.from}→${f.to}`).join(' · ');
-    const primo = d.flights[0];
-    const orario = primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : '';
+    const desc = dutyDescription(d);
+    const t = dutyTimes(d);
+    const orario = t.start ? (t.end ? `${t.start}–${t.end}` : t.start) : '';
+    const extra = d.type==='flight' && d.flights?.length ? `${d.flights.length} tratte${orario?' · '+orario:''}` : orario;
     html+=`<div class="rday"><span class="rd">${dLabel}</span>
-      <div><div class="rt">${tratte}<span class="rbadge">${d.assignment||'volo'}</span></div>
-      <div class="rm">${d.flights.length} tratte${orario?' · primo decollo '+orario:''}</div></div></div>`;
+      <div><div class="rt">${desc}<span class="rbadge">${d.assignment||d.type||''}</span></div>
+      ${extra?`<div class="rm">${extra}</div>`:''}</div></div>`;
   });
   html+=`</div>
-    <button class="btn-primary" id="roster-confirm">Aggiungi ${rosterDays.length} voli al calendario</button>
+    <button class="btn-primary" id="roster-confirm">Aggiungi ${rosterDays.length} giorni al calendario</button>
     <button class="btn-ghost" id="roster-cancel" style="margin-top:8px;">Annulla</button>`;
   wrap.innerHTML=html;
 
@@ -312,21 +424,19 @@ async function saveRoster(){
   const btn=$('roster-confirm'); btn.disabled=true; btn.textContent='Salvataggio…';
 
   const rows = rosterDays.map(d=>{
-    const primo = d.flights[0];
-    const ultimo = d.flights[d.flights.length-1];
-    const depLocal = primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : null;
-    const arrLocal = ultimo?.arr ? utcToLocalHHMM(ultimo.arr, d.date) : null;
-    const tratte = d.flights.map(f=>`${f.from}→${f.to}`).join(' ');
+    const desc = dutyDescription(d);
+    const t = dutyTimes(d);
+    const allDay = !t.start;  // se non c'è orario, evento tutto il giorno (es. ferie)
     return {
       household_id: state.household.id,
       member_id: state.me ? state.me.id : null,
-      title: tratte,
+      title: desc,
       category: 'lavoro',
-      start_at: `${d.date}T${depLocal||'06:00'}:00`,
-      end_at: arrLocal ? `${d.date}T${arrLocal}:00` : null,
-      all_day: false,
-      location: 'PSR',
-      note: `Roster · ${d.assignment||''} · ${d.flights.length} tratte`,
+      start_at: allDay ? `${d.date}T00:00:00` : `${d.date}T${t.start}:00`,
+      end_at: (!allDay && t.end) ? `${d.date}T${t.end}:00` : null,
+      all_day: allDay,
+      location: d.type==='flight' ? 'PSR' : null,
+      note: `Roster · ${DUTY_LABELS[d.type]||d.type||''}${d.assignment?' · '+d.assignment:''}`,
       source: 'roster',
       created_by: state.me ? state.me.id : null,
     };
@@ -350,7 +460,7 @@ async function saveRoster(){
   $('roster-preview').innerHTML='';
   setRosterStatus('ok', `${rows.length} voli aggiunti al calendario.`);
   // ricarica la settimana corrente
-  await loadWeekEvents(); renderWeek(); renderDayAgenda();
+  await applyCalView();
 }
 
 // ============================================================
