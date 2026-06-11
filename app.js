@@ -93,13 +93,21 @@ async function afterLogin(){
     renderHome();
     onlyShow('home');
   } else {
-    // Nessuna famiglia per questo utente: serve setup.
-    // Ma forse la famiglia esiste già (creata dall'altro genitore)?
+    // Nessun aggancio per questo utente.
+    // La famiglia esiste già (con membri validi)?
     const { data: anyHh } = await sb.from('households').select('id, name').limit(1);
+    let joinable = false;
     if(anyHh && anyHh.length){
-      // La famiglia esiste ma io non sono ancora agganciato: scelgo il mio profilo.
+      const { data: adults } = await sb
+        .from('members').select('id')
+        .eq('household_id', anyHh[0].id)
+        .eq('member_type','adulto');
+      joinable = !!(adults && adults.length);
+    }
+    if(joinable){
       await prepareJoin(anyHh[0]);
     } else {
+      // Nessuna famiglia, o famiglia incompleta (senza membri): setup pulito.
       prepareSetup();
     }
   }
@@ -202,24 +210,40 @@ async function doSetup(){
   const btn=$('btn-setup'); btn.disabled=true; btn.textContent='Creazione…';
 
   try{
-    // 1. crea famiglia
-    const { data: hh, error: e1 } = await sb.from('households').insert({ name: hhName }).select().single();
-    if(e1) throw e1;
+    // 1. famiglia: riusa quella esistente (se c'è) o creane una.
+    //    Evita doppioni se un tentativo precedente si è interrotto.
+    let hh;
+    const { data: existing } = await sb.from('households').select('*').limit(1);
+    if(existing && existing.length){
+      hh = existing[0];
+      await sb.from('households').update({ name: hhName }).eq('id', hh.id);
+    } else {
+      const { data: created, error: e1 } = await sb.from('households').insert({ name: hhName }).select().single();
+      if(e1) throw e1;
+      hh = created;
+    }
 
-    // 2. crea membri
-    const toInsert = membersInput.map(m=>({
-      household_id: hh.id,
-      display_name: m.name,
-      member_type: m.type,
-      color: m.color,
-      is_expected: m.type==='neonato',
-      occupation: m.type==='neonato' ? 'nessuna' : (m.type==='bambino' ? 'materna' : 'lavoro'),
-    }));
-    const { data: created, error: e2 } = await sb.from('members').insert(toInsert).select();
-    if(e2) throw e2;
+    // 2. crea i membri (solo se non ce ne sono già)
+    let createdMembers;
+    const { data: existingMembers } = await sb.from('members').select('*').eq('household_id', hh.id);
+    if(existingMembers && existingMembers.length){
+      createdMembers = existingMembers;
+    } else {
+      const toInsert = membersInput.map(m=>({
+        household_id: hh.id,
+        display_name: m.name,
+        member_type: m.type,
+        color: m.color,
+        is_expected: m.type==='neonato',
+        occupation: m.type==='neonato' ? 'nessuna' : (m.type==='bambino' ? 'materna' : 'lavoro'),
+      }));
+      const { data: ins, error: e2 } = await sb.from('members').insert(toInsert).select();
+      if(e2) throw e2;
+      createdMembers = ins;
+    }
 
     // 3. aggancia il mio account al profilo scelto, come admin
-    const myProfile = created.find(c=>c.display_name===iam) || created[0];
+    const myProfile = createdMembers.find(c=>c.display_name===iam) || createdMembers[0];
     const { error: e3 } = await sb.from('household_members').insert({
       household_id: hh.id,
       member_id: myProfile.id,
