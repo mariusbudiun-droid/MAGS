@@ -212,10 +212,11 @@ document.querySelectorAll('#cal-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
     document.querySelectorAll('#cal-subnav .s').forEach(x=>x.classList.remove('on'));
     s.classList.add('on');
-    ['cal-agenda','cal-voli'].forEach(id=>$(id).classList.remove('on'));
+    ['cal-agenda','cal-voli','cal-scuola'].forEach(id=>$(id).classList.remove('on'));
     $(s.dataset.s).classList.add('on');
     // FAB visibile solo in Agenda
     const fab=$('fab-event'); if(fab) fab.classList.toggle('hidden', s.dataset.s!=='cal-agenda');
+    if(s.dataset.s==='cal-scuola') openScuola();
   });
 });
 
@@ -351,3 +352,157 @@ async function saveRoster(){
   // ricarica la settimana corrente
   await loadWeekEvents(); renderWeek(); renderDayAgenda();
 }
+
+// ============================================================
+// SCUOLA — attività ricorrenti + vacanze/feste
+// ============================================================
+const WD_SHORT = [[1,'Lun'],[2,'Mar'],[3,'Mer'],[4,'Gio'],[5,'Ven'],[6,'Sab'],[7,'Dom']];
+let schMemberId = null;
+
+function openScuola(){
+  // popola select membri (bambini prima, ma tutti selezionabili)
+  const sel=$('sch-member');
+  sel.innerHTML = state.members.map(m=>`<option value="${m.id}">${m.display_name}</option>`).join('');
+  if(!schMemberId) schMemberId = (state.members.find(m=>['materna','nido','elementari','medie'].includes(m.occupation))||state.members[0])?.id;
+  if(schMemberId) sel.value = schMemberId;
+  sel.onchange = ()=>{ schMemberId = sel.value; loadScuola(); };
+  loadScuola();
+}
+
+async function loadScuola(){
+  if(!schMemberId) return;
+  const [{ data: scheds }, { data: excs }] = await Promise.all([
+    sb.from('member_schedules').select('*').eq('member_id', schMemberId).order('weekday'),
+    sb.from('schedule_exceptions').select('*').eq('member_id', schMemberId).order('start_date'),
+  ]);
+  renderSchList(scheds||[]);
+  renderExcList(excs||[]);
+}
+
+function renderSchList(list){
+  const wrap=$('sch-list'); wrap.innerHTML='';
+  if(list.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna attività. Tocca + per aggiungere scuola, nuoto, ecc.</div>'; return; }
+  // raggruppa per label
+  const byLabel={};
+  list.forEach(s=>{ (byLabel[s.label||'Attività'] ||= []).push(s); });
+  Object.entries(byLabel).forEach(([label, items])=>{
+    const giorni = items.map(i=>WD_SHORT.find(([w])=>w===i.weekday)?.[1]).filter(Boolean).join(', ');
+    const orario = items[0].start_time ? `${(items[0].start_time||'').slice(0,5)}–${(items[0].end_time||'').slice(0,5)}` : '';
+    const icon = /scuola/i.test(label)?'🏫':/nuoto/i.test(label)?'🏊':/ginnast/i.test(label)?'🤸':/calcio/i.test(label)?'⚽':/danza|ballo/i.test(label)?'🩰':/musica/i.test(label)?'🎵':'📌';
+    const row=document.createElement('div'); row.className='schrow';
+    row.innerHTML=`<div class="si">${icon}</div>
+      <div class="grow"><div class="sn">${label}</div><div class="sm">${giorni}${orario?' · '+orario:''}</div></div>
+      <button class="del">×</button>`;
+    row.querySelector('.del').onclick=async (e)=>{
+      e.stopPropagation();
+      if(!confirm(`Eliminare "${label}"?`)) return;
+      for(const it of items){ await sb.from('member_schedules').delete().eq('id', it.id); }
+      loadScuola();
+    };
+    row.onclick=()=>openActModal(label, items);
+    wrap.appendChild(row);
+  });
+}
+
+function renderExcList(list){
+  const wrap=$('sch-exc-list'); wrap.innerHTML='';
+  if(list.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna vacanza o festa.</div>'; return; }
+  const kindLabel={vacanza:'Vacanza',festa:'Festa',assenza:'Assenza'};
+  list.forEach(x=>{
+    const d1=new Date(x.start_date+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+    const d2=new Date(x.end_date+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+    const range = x.start_date===x.end_date ? d1 : `${d1} → ${d2}`;
+    const row=document.createElement('div'); row.className='schrow';
+    row.innerHTML=`<div class="si" style="background:color-mix(in srgb,var(--accent) 16%,transparent)">${x.kind==='festa'?'🎉':x.kind==='assenza'?'🚫':'🏖'}</div>
+      <div class="grow"><div class="sn">${x.note||kindLabel[x.kind]}</div><div class="sm">${range}</div></div>
+      <button class="del">×</button>`;
+    row.querySelector('.del').onclick=async (e)=>{
+      e.stopPropagation();
+      await sb.from('schedule_exceptions').delete().eq('id', x.id);
+      loadScuola();
+    };
+    row.onclick=()=>openExcModal(x);
+    wrap.appendChild(row);
+  });
+}
+
+// ---- modal attività ----
+let editingActLabel = null;
+function openActModal(label, items){
+  editingActLabel = label || null;
+  $('act-modal-title').textContent = label ? 'Modifica attività' : 'Nuova attività';
+  $('act-label').value = label || '';
+  // giorni
+  const dwrap=$('act-days'); dwrap.innerHTML='';
+  const activeDays = new Set((items||[]).map(i=>i.weekday));
+  WD_SHORT.forEach(([w,lbl])=>{
+    const b=document.createElement('div'); b.className='dp'+(activeDays.has(w)?' on':''); b.textContent=lbl; b.dataset.wd=w;
+    b.onclick=()=>b.classList.toggle('on');
+    dwrap.appendChild(b);
+  });
+  $('act-start').value = items?.[0]?.start_time ? (items[0].start_time||'').slice(0,5) : '';
+  $('act-end').value = items?.[0]?.end_time ? (items[0].end_time||'').slice(0,5) : '';
+  $('act-delete').style.display = label ? 'block' : 'none';
+  clearError('act-error');
+  $('act-modal').classList.remove('hidden');
+}
+$('act-cancel').addEventListener('click', ()=>$('act-modal').classList.add('hidden'));
+$('act-modal').addEventListener('click', e=>{ if(e.target.id==='act-modal') $('act-modal').classList.add('hidden'); });
+$('sch-add-act').addEventListener('click', ()=>openActModal(null,null));
+
+$('act-save').addEventListener('click', async ()=>{
+  clearError('act-error');
+  const label=$('act-label').value.trim();
+  if(!label){ showError('act-error','Inserisci un nome.'); return; }
+  const days=[...document.querySelectorAll('#act-days .dp.on')].map(b=>parseInt(b.dataset.wd));
+  if(days.length===0){ showError('act-error','Scegli almeno un giorno.'); return; }
+  const st=$('act-start').value||null, en=$('act-end').value||null;
+
+  // se sto modificando, rimuovo le righe vecchie di quel label
+  if(editingActLabel){
+    const { data: old } = await sb.from('member_schedules').select('id').eq('member_id',schMemberId).eq('label',editingActLabel);
+    for(const o of (old||[])){ await sb.from('member_schedules').delete().eq('id',o.id); }
+  }
+  const rows = days.map(wd=>({ member_id:schMemberId, weekday:wd, start_time:st, end_time:en, label, active:true }));
+  const { error } = await sb.from('member_schedules').insert(rows);
+  if(error){ showError('act-error','Errore: '+error.message); return; }
+  $('act-modal').classList.add('hidden'); loadScuola();
+});
+$('act-delete').addEventListener('click', async ()=>{
+  if(!editingActLabel) return;
+  const { data: old } = await sb.from('member_schedules').select('id').eq('member_id',schMemberId).eq('label',editingActLabel);
+  for(const o of (old||[])){ await sb.from('member_schedules').delete().eq('id',o.id); }
+  $('act-modal').classList.add('hidden'); loadScuola();
+});
+
+// ---- modal vacanza/festa ----
+let editingExc=null;
+function openExcModal(x){
+  editingExc = x ? x.id : null;
+  $('exc-kind').value = x?.kind || 'vacanza';
+  $('exc-note').value = x?.note || '';
+  $('exc-start').value = x?.start_date || '';
+  $('exc-end').value = x?.end_date || '';
+  $('exc-delete').style.display = x ? 'block' : 'none';
+  clearError('exc-error');
+  $('exc-modal').classList.remove('hidden');
+}
+$('exc-cancel').addEventListener('click', ()=>$('exc-modal').classList.add('hidden'));
+$('exc-modal').addEventListener('click', e=>{ if(e.target.id==='exc-modal') $('exc-modal').classList.add('hidden'); });
+$('sch-add-exc').addEventListener('click', ()=>openExcModal(null));
+
+$('exc-save').addEventListener('click', async ()=>{
+  clearError('exc-error');
+  const start=$('exc-start').value, end=$('exc-end').value||$('exc-start').value;
+  if(!start){ showError('exc-error','Scegli almeno la data di inizio.'); return; }
+  const payload={ member_id:schMemberId, kind:$('exc-kind').value, start_date:start, end_date:end, note:$('exc-note').value.trim()||null };
+  let error;
+  if(editingExc){ ({error}=await sb.from('schedule_exceptions').update(payload).eq('id',editingExc)); }
+  else { ({error}=await sb.from('schedule_exceptions').insert(payload)); }
+  if(error){ showError('exc-error','Errore: '+error.message); return; }
+  $('exc-modal').classList.add('hidden'); loadScuola();
+});
+$('exc-delete').addEventListener('click', async ()=>{
+  if(editingExc){ await sb.from('schedule_exceptions').delete().eq('id',editingExc); }
+  $('exc-modal').classList.add('hidden'); loadScuola();
+});

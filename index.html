@@ -104,6 +104,7 @@
       <div class="subnav" id="cal-subnav">
         <div class="s on" data-s="cal-agenda">Agenda</div>
         <div class="s" data-s="cal-voli">Voli</div>
+        <div class="s" data-s="cal-scuola">Scuola</div>
       </div>
 
       <!-- sotto: agenda -->
@@ -137,6 +138,18 @@
         </div>
         <div id="roster-status"></div>
         <div id="roster-preview"></div>
+      </div>
+
+      <!-- sotto: scuola (attività ricorrenti + orario + vacanze) -->
+      <div class="sub" id="cal-scuola">
+        <label class="field-label" style="margin-top:4px;">Chi</label>
+        <select class="field" id="sch-member"></select>
+
+        <div class="sec-row"><h2>Attività e orari</h2><button class="editbtn" id="sch-add-act">+ Aggiungi</button></div>
+        <div class="card" id="sch-list" style="padding:6px 16px;"></div>
+
+        <div class="sec-row"><h2>Vacanze e feste</h2><button class="editbtn" id="sch-add-exc">+ Aggiungi</button></div>
+        <div class="card" id="sch-exc-list" style="padding:6px 16px;"></div>
       </div>
     </div>
   </div>
@@ -268,6 +281,48 @@
 
   <!-- FAB nuovo evento (solo in vista calendario) -->
   <button class="fab hidden" id="fab-event">+</button>
+
+  <!-- Modal attività/orario scuola -->
+  <div class="modal hidden" id="act-modal">
+    <div class="modal-card">
+      <h2 class="modal-title" id="act-modal-title">Nuova attività</h2>
+      <label class="field-label">Nome</label>
+      <input class="field" id="act-label" placeholder="Es. Nuoto, Scuola, Ginnastica">
+      <label class="field-label">Giorni</label>
+      <div class="daypick" id="act-days"></div>
+      <div class="row2">
+        <div style="flex:1"><label class="field-label">Inizio</label><input class="field" id="act-start" type="time"></div>
+        <div style="flex:1"><label class="field-label">Fine</label><input class="field" id="act-end" type="time"></div>
+      </div>
+      <button class="btn-primary" id="act-save">Salva</button>
+      <button class="btn-ghost" id="act-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="act-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="act-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal vacanza/festa -->
+  <div class="modal hidden" id="exc-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Vacanza o festa</h2>
+      <label class="field-label">Tipo</label>
+      <select class="field" id="exc-kind">
+        <option value="vacanza">Vacanza</option>
+        <option value="festa">Festa / chiusura</option>
+        <option value="assenza">Assenza</option>
+      </select>
+      <label class="field-label">Descrizione (facoltativo)</label>
+      <input class="field" id="exc-note" placeholder="Es. Vacanze estive">
+      <div class="row2">
+        <div style="flex:1"><label class="field-label">Dal</label><input class="field" id="exc-start" type="date"></div>
+        <div style="flex:1"><label class="field-label">Al</label><input class="field" id="exc-end" type="date"></div>
+      </div>
+      <button class="btn-primary" id="exc-save">Salva</button>
+      <button class="btn-ghost" id="exc-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="exc-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="exc-error"></p>
+    </div>
+  </div>
 
   <!-- Modal nuovo/modifica evento -->
   <div class="modal hidden" id="event-modal">
