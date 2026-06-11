@@ -90,11 +90,29 @@
     </div>
   </div>
 
-  <!-- ===== CALENDARIO (placeholder) ===== -->
+  <!-- ===== CALENDARIO ===== -->
   <div class="view" id="v-cal">
     <div class="app-screen">
-      <header class="greet"><div class="kick">Calendario</div><h1>In <span class="nm">arrivo</span></h1></header>
-      <div class="card"><p class="placeholder-text">Il calendario con eventi e voli arriverà nel prossimo aggiornamento.</p></div>
+      <header class="greet"><div class="kick" id="cal-monthlabel">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></header>
+
+      <div class="filter" id="cal-filter"></div>
+
+      <div class="cal-head">
+        <button class="cal-nav" id="cal-prev">‹</button>
+        <div class="cal-month" id="cal-monthname">—</div>
+        <button class="cal-nav" id="cal-next">›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Lavoro</span>
+        <span><i style="background:#ffaa3c"></i>Scuola</span>
+        <span><i style="background:#9d7bff"></i>Appuntamento</span>
+        <span><i style="background:#22b8a6"></i>Salute</span>
+      </div>
+
+      <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
+      <div class="card" id="cal-events" style="padding:6px 16px;"></div>
     </div>
   </div>
 
@@ -156,6 +174,42 @@
         <div class="color-row" id="theme-colors"></div>
         <button class="btn-ghost" id="btn-logout" style="margin-top:22px;">Esci</button>
       </div>
+    </div>
+  </div>
+
+  <!-- FAB nuovo evento (solo in vista calendario) -->
+  <button class="fab hidden" id="fab-event">+</button>
+
+  <!-- Modal nuovo/modifica evento -->
+  <div class="modal hidden" id="event-modal">
+    <div class="modal-card">
+      <h2 class="modal-title" id="event-modal-title">Nuovo evento</h2>
+      <label class="field-label">Titolo</label>
+      <input class="field" id="ev-title" placeholder="Es. Visita pediatra">
+      <label class="field-label">Chi</label>
+      <select class="field" id="ev-member"></select>
+      <label class="field-label">Tipo</label>
+      <select class="field" id="ev-category">
+        <option value="appuntamento">Appuntamento</option>
+        <option value="lavoro">Lavoro</option>
+        <option value="scuola">Scuola</option>
+        <option value="salute">Salute</option>
+        <option value="famiglia">Famiglia</option>
+      </select>
+      <label class="field-label">Data</label>
+      <input class="field" id="ev-date" type="date">
+      <div class="row2">
+        <div style="flex:1"><label class="field-label">Inizio</label><input class="field" id="ev-start" type="time"></div>
+        <div style="flex:1"><label class="field-label">Fine</label><input class="field" id="ev-end" type="time"></div>
+      </div>
+      <label class="field-label">Luogo (facoltativo)</label>
+      <input class="field" id="ev-location" placeholder="Es. Studio Dr.ssa Conti">
+      <label class="field-label">Note (facoltativo)</label>
+      <input class="field" id="ev-note" placeholder="">
+      <button class="btn-primary" id="ev-save">Salva evento</button>
+      <button class="btn-ghost" id="ev-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="ev-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="ev-error"></p>
     </div>
   </div>
 
