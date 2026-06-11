@@ -510,5 +510,12 @@ $('btn-logout').addEventListener('click', async ()=>{
 });
 
 // Via!
+// mostra la versione nell'etichetta (sezione tema)
+document.addEventListener('DOMContentLoaded', ()=>{
+  const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION;
+});
+
 applyTheme('aurora','system');  // tema neutro finché non carico il profilo
 boot();
+// imposta subito la versione se il DOM è già pronto
+(()=>{ const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION; })();
