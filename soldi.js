@@ -4,6 +4,13 @@
 // ============================================================
 const soldi = { accounts: [], categories: [], transactions: [], budgets: [], bills: [], goals: [] };
 
+// palette per le icone-categoria (come nel mockup)
+const CAT_PALETTE = ['#5b6cff','#ffaa3c','#22b8a6','#ff5e9c','#9d7bff','#ff7a4f','#1fb46b','#5ea8ff'];
+function catColor(cat){
+  const i = soldi.categories.findIndex(c=>c.id===cat?.id);
+  return CAT_PALETTE[(i<0?0:i) % CAT_PALETTE.length];
+}
+
 const DEFAULT_ACCOUNTS = [
   { name:'Conto comune', kind:'comune', icon:'🏦' },
   { name:'Risparmi', kind:'risparmi', icon:'🐷' },
@@ -80,8 +87,9 @@ function renderPanoramica(){
   if(entries.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna spesa questo mese.</div>'; return; }
   entries.forEach(([cid,amt])=>{
     const c=catById(cid);
+    const col=catColor(c);
     const row=document.createElement('div'); row.className='cat';
-    row.innerHTML=`<div class="ci">${c?.icon||'💸'}</div>
+    row.innerHTML=`<div class="ci" style="background:color-mix(in srgb,${col} 18%,transparent)">${c?.icon||'💸'}</div>
       <div><div class="cn">${c?c.name:'Senza categoria'}</div></div>
       <div class="camt">${eur(amt)}</div>`;
     wrap.appendChild(row);
@@ -113,12 +121,13 @@ function renderBudget(){
   const tm = thisMonthTx();
   soldi.budgets.forEach(b=>{
     const c=catById(b.category_id);
+    const col=catColor(c);
     const spent = tm.filter(t=>t.kind==='uscita'&&t.category_id===b.category_id).reduce((s,t)=>s+(+t.amount||0),0);
     const pct = Math.min(100, Math.round(spent/(+b.monthly_limit||1)*100));
     const over = spent > (+b.monthly_limit||0);
     const item=document.createElement('div'); item.className='budget-item';
     item.innerHTML=`<div class="bh"><span>${c?.icon||''} ${c?c.name:'?'}</span><span class="amt">${eur(spent)} / ${eur(b.monthly_limit)}</span></div>
-      <div class="bar"><i style="width:${pct}%;background:${over?'#e23b5a':'var(--accent)'}"></i></div>`;
+      <div class="bar"><i style="width:${pct}%;background:${over?'#e23b5a':col}"></i></div>`;
     wrap.appendChild(item);
   });
 }
@@ -143,13 +152,14 @@ function renderBollette(){
 function renderObiettivi(){
   const wrap=$('sol-goallist'); wrap.innerHTML='';
   if(soldi.goals.length===0){ wrap.innerHTML='<div class="sol-empty">Nessun obiettivo. Tocca + Nuovo.</div>'; return; }
-  soldi.goals.forEach(g=>{
+  soldi.goals.forEach((g,gi)=>{
     const cur=+g.current_amount||0, tgt=+g.target_amount||1;
     const pct=Math.min(100, Math.round(cur/tgt*100));
     const manca = Math.max(0, tgt-cur);
+    const col = CAT_PALETTE[gi % CAT_PALETTE.length];
     const row=document.createElement('div'); row.className='goal';
     row.innerHTML=`<div class="gh"><span class="gn">${g.name}</span><span class="gv">${eur(cur)} / ${eur(tgt)}</span></div>
-      <div class="bar"><i style="width:${pct}%;background:var(--accent)"></i></div>
+      <div class="bar"><i style="width:${pct}%;background:${col}"></i></div>
       <div class="gp">${pct}% · ${manca>0?'mancano '+eur(manca):'completato'} · default ${(+g.default_pct||0)}%</div>`;
     row.onclick=()=>openGoalModal(g);
     wrap.appendChild(row);
@@ -170,8 +180,9 @@ function renderConti(){
 function renderCategorie(){
   const wrap=$('sol-catlist'); wrap.innerHTML='';
   soldi.categories.forEach(c=>{
+    const col=catColor(c);
     const row=document.createElement('div'); row.className='cat';
-    row.innerHTML=`<div class="ci">${c.icon||'💸'}</div>
+    row.innerHTML=`<div class="ci" style="background:color-mix(in srgb,${col} 18%,transparent)">${c.icon||'💸'}</div>
       <div class="grow"><div class="cn">${c.name}</div></div>
       <button class="del" title="Elimina">×</button>`;
     row.querySelector('.del').onclick=async ()=>{
