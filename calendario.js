@@ -205,3 +205,149 @@ $('ev-delete').addEventListener('click', async ()=>{
 });
 
 // ============================================================
+// ============================================================
+// SUBNAV calendario (Agenda / Voli) + IMPORT ROSTER
+// ============================================================
+document.querySelectorAll('#cal-subnav .s').forEach(s=>{
+  s.addEventListener('click', ()=>{
+    document.querySelectorAll('#cal-subnav .s').forEach(x=>x.classList.remove('on'));
+    s.classList.add('on');
+    ['cal-agenda','cal-voli'].forEach(id=>$(id).classList.remove('on'));
+    $(s.dataset.s).classList.add('on');
+    // FAB visibile solo in Agenda
+    const fab=$('fab-event'); if(fab) fab.classList.toggle('hidden', s.dataset.s!=='cal-agenda');
+  });
+});
+
+// --- conversione orario UTC -> ora italiana (UTC+2, ora legale estiva) ---
+// Nota: l'Italia è UTC+1 in inverno, UTC+2 in estate. Per i roster estivi usiamo +2.
+// (rifinibile in seguito con calcolo DST esatto)
+function utcToLocalHHMM(hhmm, dateStr){
+  if(!hhmm) return hhmm;
+  const [h,m] = hhmm.split(':').map(Number);
+  // determina offset: ora legale ~ ultima dom marzo → ultima dom ottobre
+  const d = new Date(dateStr+'T00:00:00Z');
+  const year = d.getUTCFullYear();
+  const lastSunday = (mon)=>{ const dt=new Date(Date.UTC(year,mon+1,0)); dt.setUTCDate(dt.getUTCDate()-dt.getUTCDay()); return dt; };
+  const dstStart = lastSunday(2); // marzo
+  const dstEnd = lastSunday(9);   // ottobre
+  const isDST = d>=dstStart && d<dstEnd;
+  const offset = isDST ? 2 : 1;
+  let total = h*60 + m + offset*60;
+  total = ((total % 1440) + 1440) % 1440;
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+
+let rosterDays = null; // giorni importati in attesa di conferma
+
+$('roster-pick').addEventListener('click', ()=> $('roster-file').click());
+
+$('roster-file').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  $('roster-preview').innerHTML='';
+  setRosterStatus('load','Lettura del roster in corso… può richiedere qualche secondo.');
+
+  try{
+    const base64 = await fileToBase64(file);
+    const resp = await fetch('/api/import-roster', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imageBase64: base64, mediaType: file.type })
+    });
+    const data = await resp.json();
+    if(!resp.ok || !data.success){
+      setRosterStatus('err', data.error || 'Import non riuscito. Riprova.');
+      return;
+    }
+    rosterDays = (data.days||[]).filter(d=>d.type==='flight' && Array.isArray(d.flights) && d.flights.length);
+    if(rosterDays.length===0){
+      setRosterStatus('err','Nessun giorno di volo trovato nello screenshot.');
+      return;
+    }
+    clearRosterStatus();
+    renderRosterPreview();
+  }catch(err){
+    setRosterStatus('err','Errore: '+(err.message||err));
+  }
+  e.target.value=''; // reset così puoi ricaricare lo stesso file
+});
+
+function fileToBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(String(r.result).split(',')[1]);
+    r.onerror=()=>rej(new Error('Lettura file fallita'));
+    r.readAsDataURL(file);
+  });
+}
+
+function setRosterStatus(kind,msg){ $('roster-status').innerHTML=`<div class="roster-msg ${kind}">${msg}</div>`; }
+function clearRosterStatus(){ $('roster-status').innerHTML=''; }
+
+function renderRosterPreview(){
+  const wrap=$('roster-preview');
+  let html=`<div class="sec-row"><h2>Voli trovati: ${rosterDays.length} giorni</h2></div><div class="card" style="padding:6px 16px;">`;
+  rosterDays.forEach(d=>{
+    const dLabel = new Date(d.date+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
+    const tratte = d.flights.map(f=>`${f.from}→${f.to}`).join(' · ');
+    const primo = d.flights[0];
+    const orario = primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : '';
+    html+=`<div class="rday"><span class="rd">${dLabel}</span>
+      <div><div class="rt">${tratte}<span class="rbadge">${d.assignment||'volo'}</span></div>
+      <div class="rm">${d.flights.length} tratte${orario?' · primo decollo '+orario:''}</div></div></div>`;
+  });
+  html+=`</div>
+    <button class="btn-primary" id="roster-confirm">Aggiungi ${rosterDays.length} voli al calendario</button>
+    <button class="btn-ghost" id="roster-cancel" style="margin-top:8px;">Annulla</button>`;
+  wrap.innerHTML=html;
+
+  $('roster-confirm').addEventListener('click', saveRoster);
+  $('roster-cancel').addEventListener('click', ()=>{ rosterDays=null; wrap.innerHTML=''; clearRosterStatus(); });
+}
+
+async function saveRoster(){
+  if(!rosterDays || !rosterDays.length) return;
+  const btn=$('roster-confirm'); btn.disabled=true; btn.textContent='Salvataggio…';
+
+  const rows = rosterDays.map(d=>{
+    const primo = d.flights[0];
+    const ultimo = d.flights[d.flights.length-1];
+    const depLocal = primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : null;
+    const arrLocal = ultimo?.arr ? utcToLocalHHMM(ultimo.arr, d.date) : null;
+    const tratte = d.flights.map(f=>`${f.from}→${f.to}`).join(' ');
+    return {
+      household_id: state.household.id,
+      member_id: state.me ? state.me.id : null,
+      title: tratte,
+      category: 'lavoro',
+      start_at: `${d.date}T${depLocal||'06:00'}:00`,
+      end_at: arrLocal ? `${d.date}T${arrLocal}:00` : null,
+      all_day: false,
+      location: 'PSR',
+      note: `Roster · ${d.assignment||''} · ${d.flights.length} tratte`,
+      source: 'roster',
+      created_by: state.me ? state.me.id : null,
+    };
+  });
+
+  // evita doppioni: cancella eventi roster già presenti nelle stesse date
+  const dates = rosterDays.map(d=>d.date);
+  for(const dt of dates){
+    await sb.from('events').delete()
+      .eq('household_id', state.household.id)
+      .eq('member_id', state.me?state.me.id:null)
+      .eq('source','roster')
+      .gte('start_at', dt+'T00:00:00').lt('start_at', dt+'T23:59:59');
+  }
+
+  const { error } = await sb.from('events').insert(rows);
+  btn.disabled=false; btn.textContent='Aggiungi al calendario';
+  if(error){ setRosterStatus('err','Errore nel salvataggio: '+error.message); return; }
+
+  rosterDays=null;
+  $('roster-preview').innerHTML='';
+  setRosterStatus('ok', `${rows.length} voli aggiunti al calendario.`);
+  // ricarica la settimana corrente
+  await loadWeekEvents(); renderWeek(); renderDayAgenda();
+}

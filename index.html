@@ -101,24 +101,43 @@
     <div class="app-screen">
       <header class="greet"><div class="kick">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></header>
 
-      <div class="filter" id="cal-filter"></div>
-
-      <div class="legend" style="margin:0 2px 12px;">
-        <span><i style="background:var(--accent)"></i>Lavoro</span>
-        <span><i style="background:#ffaa3c"></i>Scuola</span>
-        <span><i style="background:#9d7bff"></i>Appuntamento</span>
-        <span><i style="background:#22b8a6"></i>Salute</span>
+      <div class="subnav" id="cal-subnav">
+        <div class="s on" data-s="cal-agenda">Agenda</div>
+        <div class="s" data-s="cal-voli">Voli</div>
       </div>
 
-      <div class="cal-head">
-        <button class="cal-nav" id="cal-prev">‹</button>
-        <div class="cal-month" id="cal-weeklabel">—</div>
-        <button class="cal-nav" id="cal-next">›</button>
-      </div>
-      <div class="week" id="cal-week"></div>
+      <!-- sotto: agenda -->
+      <div class="sub on" id="cal-agenda">
+        <div class="filter" id="cal-filter"></div>
 
-      <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
-      <div class="card" id="cal-events" style="padding:6px 16px;"></div>
+        <div class="legend" style="margin:0 2px 12px;">
+          <span><i style="background:var(--accent)"></i>Lavoro</span>
+          <span><i style="background:#ffaa3c"></i>Scuola</span>
+          <span><i style="background:#9d7bff"></i>Appuntamento</span>
+          <span><i style="background:#22b8a6"></i>Salute</span>
+        </div>
+
+        <div class="cal-head">
+          <button class="cal-nav" id="cal-prev">‹</button>
+          <div class="cal-month" id="cal-weeklabel">—</div>
+          <button class="cal-nav" id="cal-next">›</button>
+        </div>
+        <div class="week" id="cal-week"></div>
+
+        <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
+        <div class="card" id="cal-events" style="padding:6px 16px;"></div>
+      </div>
+
+      <!-- sotto: voli (import roster) -->
+      <div class="sub" id="cal-voli">
+        <div class="card pad" style="text-align:center;padding:20px;">
+          <div style="font-size:13px;color:var(--ink-soft);margin-bottom:14px;line-height:1.5;">Carica uno screenshot del roster da Ryanair Connect.<br>L'AI lo legge e crea i voli nel calendario.</div>
+          <button class="btn-primary" id="roster-pick" style="margin-top:0;">📷 Importa roster</button>
+          <input type="file" id="roster-file" accept="image/*" style="display:none;">
+        </div>
+        <div id="roster-status"></div>
+        <div id="roster-preview"></div>
+      </div>
     </div>
   </div>
 

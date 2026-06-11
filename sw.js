@@ -2,7 +2,7 @@
 // MAGS — Service Worker
 // Cache-bump: incrementa CACHE_VERSION a ogni release.
 // ============================================================
-const CACHE_VERSION = 'mags-v0.6.0';
+const CACHE_VERSION = 'mags-v0.7.0';
 const ASSETS = [
   './',
   './index.html',
@@ -36,6 +36,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   // Le chiamate a Supabase non vanno mai in cache
   if (req.url.includes('supabase.co')) return;
+  if (req.url.includes('/api/')) return;
+  if (req.url.includes('generativelanguage')) return;
   if (req.method !== 'GET') return;
 
   // stale-while-revalidate per gli asset locali

@@ -438,8 +438,9 @@ document.querySelectorAll('#tabbar .tab').forEach(t=>{
     t.classList.add('on');
     document.querySelectorAll('#home .view').forEach(v=>v.classList.remove('on'));
     $('v-'+t.dataset.v).classList.add('on');
-    // FAB visibile solo nel calendario
-    $('fab-event').classList.toggle('hidden', t.dataset.v !== 'cal');
+    // FAB visibile solo nel calendario, sottosezione Agenda
+    const inAgenda = $('cal-agenda') && $('cal-agenda').classList.contains('on');
+    $('fab-event').classList.toggle('hidden', !(t.dataset.v === 'cal' && inAgenda));
     if(t.dataset.v === 'cal') openCalendar();
     if(t.dataset.v === 'casa') openCasa();
     if(t.dataset.v === 'soldi') openSoldi();
