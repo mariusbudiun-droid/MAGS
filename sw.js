@@ -2,7 +2,7 @@
 // MAGS — Service Worker
 // Cache-bump: incrementa CACHE_VERSION a ogni release.
 // ============================================================
-const CACHE_VERSION = 'mags-v0.1.1';
+const CACHE_VERSION = 'mags-v0.2.0';
 const ASSETS = [
   './',
   './index.html',

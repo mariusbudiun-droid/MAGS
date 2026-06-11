@@ -30,6 +30,26 @@ function showError(id, msg){ const e=$(id); e.textContent=msg; e.classList.remov
 function clearError(id){ $(id).classList.add('hidden'); }
 
 // ============================================================
+// TEMA: applica famiglia + luminosità del membro corrente
+// ============================================================
+const sysMq = window.matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(fam, lum){
+  document.body.dataset.fam = fam || 'aurora';
+  const realLum = (lum === 'system' || !lum) ? (sysMq.matches ? 'dark' : 'light') : lum;
+  document.body.dataset.lum = realLum;
+  // theme-color della barra di sistema
+  const tc = document.querySelector('meta[name="theme-color"]');
+  if(tc) tc.setAttribute('content', realLum==='dark' ? '#0f1424' : '#5b6cff');
+}
+// se sono in "sistema", reagisci al cambio del telefono
+sysMq.addEventListener('change', ()=>{
+  if(state.me && state.me.theme_lum === 'system') applyTheme(state.me.theme_family,'system');
+});
+function applyMyTheme(){
+  if(state.me) applyTheme(state.me.theme_family, state.me.theme_lum);
+}
+
+// ============================================================
 // AVVIO: controlla se c'è già una sessione
 // ============================================================
 async function boot(){
@@ -301,9 +321,11 @@ async function prepareJoin(hh){
 }
 
 // ============================================================
-// HOME (minima per ora)
+// HOME + navigazione
 // ============================================================
 function renderHome(){
+  applyMyTheme();
+
   const oggi = new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
   $('home-date').textContent = oggi.charAt(0).toUpperCase()+oggi.slice(1);
   $('home-name').textContent = state.me ? state.me.display_name : 'famiglia';
@@ -317,11 +339,184 @@ function renderHome(){
       <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>`;
     wrap.appendChild(row);
   });
+
+  renderFamiglia();
+  initThemePicker();
 }
 
 function etichettaOcc(o){
   const map={nessuna:'—',nido:'Nido',materna:'Materna',elementari:'Elementari',medie:'Medie',lavoro:'Lavoro',cabin_crew:'Cabin crew'};
   return map[o]||o;
+}
+
+// ---- navigazione tab principali ----
+document.querySelectorAll('#tabbar .tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('#tabbar .tab').forEach(x=>x.classList.remove('on'));
+    t.classList.add('on');
+    document.querySelectorAll('#home .view').forEach(v=>v.classList.remove('on'));
+    $('v-'+t.dataset.v).classList.add('on');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+});
+// ---- navigazione sottosezioni Famiglia ----
+document.querySelectorAll('#fam-subnav .s').forEach(s=>{
+  s.addEventListener('click', ()=>{
+    document.querySelectorAll('#fam-subnav .s').forEach(x=>x.classList.remove('on'));
+    s.classList.add('on');
+    ['fam-membri','fam-accessi','fam-tema'].forEach(id=>$(id).classList.remove('on'));
+    $(s.dataset.s).classList.add('on');
+  });
+});
+
+// ============================================================
+// SEZIONE FAMIGLIA
+// ============================================================
+function renderFamiglia(){
+  renderMembersList();
+  renderAccessi();
+}
+
+const OCC_OPTS = [['nessuna','Nessuna'],['nido','Nido'],['materna','Materna'],['elementari','Elementari'],['medie','Medie'],['lavoro','Lavoro'],['cabin_crew','Cabin crew']];
+const TYPE_OPTS = [['adulto','Adulto'],['bambino','Bambino'],['neonato','Neonato']];
+
+function renderMembersList(){
+  const wrap = $('fam-members-list'); wrap.innerHTML='';
+  state.members.forEach(m=>{
+    const initial=(m.display_name||'?').charAt(0).toUpperCase();
+    const sub = m.is_expected ? 'In arrivo' : `${tipoLabel(m.member_type)} · ${etichettaOcc(m.occupation)}`;
+    const row=document.createElement('div'); row.className='medit';
+    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
+      <div class="grow"><div class="nm">${m.display_name}</div><div class="ms">${sub}</div></div>
+      <button class="edit-ic" title="Modifica">✎</button>`;
+    row.querySelector('.edit-ic').addEventListener('click', ()=>openMemberEdit(m, row));
+    wrap.appendChild(row);
+  });
+}
+
+function tipoLabel(t){ return ({adulto:'Adulto',bambino:'Bambino',neonato:'Neonato'})[t]||t; }
+
+function openMemberEdit(m, rowEl){
+  const form=document.createElement('div'); form.className='medit-form';
+  form.innerHTML = `
+    <div style="display:flex;gap:9px;align-items:center;">
+      <input type="color" class="su-dot" id="me-color" value="${m.color}">
+      <input type="text" class="field" id="me-name" value="${m.display_name}" style="flex:1;margin:0;">
+    </div>
+    <div class="row2">
+      <select class="field" id="me-type">${TYPE_OPTS.map(([v,l])=>`<option value="${v}"${m.member_type===v?' selected':''}>${l}</option>`).join('')}</select>
+      <select class="field" id="me-occ">${OCC_OPTS.map(([v,l])=>`<option value="${v}"${m.occupation===v?' selected':''}>${l}</option>`).join('')}</select>
+    </div>
+    ${m.is_expected ? `<button class="btn-ghost" id="me-born" style="margin-top:10px;">🍼 È nato! · attiva profilo</button>` : ''}
+    <button class="btn-primary save" id="me-save">Salva</button>
+    <button class="btn-ghost" id="me-cancel" style="margin-top:8px;">Annulla</button>
+    <p class="auth-error hidden" id="me-error"></p>`;
+  rowEl.replaceWith(form);
+
+  $('me-cancel').addEventListener('click', renderMembersList);
+  if($('me-born')){
+    $('me-born').addEventListener('click', async ()=>{
+      const today = new Date().toISOString().slice(0,10);
+      await updateMember(m.id, { is_expected:false, member_type:'neonato', birth_date:today });
+    });
+  }
+  $('me-save').addEventListener('click', async ()=>{
+    const patch = {
+      display_name: $('me-name').value.trim() || m.display_name,
+      color: $('me-color').value,
+      member_type: $('me-type').value,
+      occupation: $('me-occ').value,
+    };
+    await updateMember(m.id, patch);
+  });
+}
+
+async function updateMember(id, patch){
+  const { error } = await sb.from('members').update(patch).eq('id', id);
+  if(error){ const e=$('me-error'); if(e){e.textContent='Errore: '+error.message; e.classList.remove('hidden');} return; }
+  // ricarico i membri
+  const { data: ms } = await sb.from('members').select('*').eq('household_id', state.household.id).order('created_at');
+  state.members = ms||[];
+  state.me = state.members.find(x=>x.id===state.me?.id) || state.me;
+  applyMyTheme();
+  renderMembersList();
+  // aggiorno anche la home
+  renderHomeMembersOnly();
+}
+function renderHomeMembersOnly(){
+  const wrap = $('home-members'); if(!wrap) return; wrap.innerHTML='';
+  state.members.forEach(m=>{
+    const initial=(m.display_name||'?').charAt(0).toUpperCase();
+    const occ = m.is_expected ? 'in arrivo' : etichettaOcc(m.occupation);
+    const row=document.createElement('div'); row.className='mrow';
+    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
+      <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>`;
+    wrap.appendChild(row);
+  });
+}
+
+// aggiungi nuovo membro
+$('fam-add-member').addEventListener('click', async ()=>{
+  const color = MAGS_CONFIG.MEMBER_COLORS[state.members.length % MAGS_CONFIG.MEMBER_COLORS.length];
+  const { data, error } = await sb.from('members').insert({
+    household_id: state.household.id, display_name:'Nuovo membro', member_type:'adulto', color, occupation:'nessuna'
+  }).select().single();
+  if(error){ alert('Errore: '+error.message); return; }
+  const { data: ms } = await sb.from('members').select('*').eq('household_id', state.household.id).order('created_at');
+  state.members = ms||[];
+  renderMembersList();
+});
+
+// ---- Accessi: chi ha un account collegato ----
+async function renderAccessi(){
+  const wrap=$('fam-accessi-list'); wrap.innerHTML='';
+  const { data: links } = await sb.from('household_members').select('member_id, role, user_id').eq('household_id', state.household.id);
+  const linkedIds = new Set((links||[]).map(l=>l.member_id));
+  state.members.forEach(m=>{
+    const linked = linkedIds.has(m.id);
+    const initial=(m.display_name||'?').charAt(0).toUpperCase();
+    const badge = linked
+      ? `<span class="badge">account attivo</span>`
+      : `<span class="badge muted">profilo</span>`;
+    const row=document.createElement('div'); row.className='medit';
+    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
+      <div class="grow"><div class="nm">${m.display_name} ${badge}</div>
+      <div class="ms">${linked?'può accedere':'gestito dai genitori'}</div></div>`;
+    wrap.appendChild(row);
+  });
+}
+
+// ============================================================
+// TEMA: picker nella sezione Famiglia
+// ============================================================
+function initThemePicker(){
+  if(!state.me) return;
+  // famiglia
+  document.querySelectorAll('#theme-fam .theme-opt').forEach(b=>{
+    b.classList.toggle('on', b.dataset.fam===state.me.theme_family);
+    b.onclick = ()=> setMyTheme({ theme_family:b.dataset.fam });
+  });
+  // luminosità
+  document.querySelectorAll('#theme-lum .theme-opt').forEach(b=>{
+    b.classList.toggle('on', b.dataset.lum===state.me.theme_lum);
+    b.onclick = ()=> setMyTheme({ theme_lum:b.dataset.lum });
+  });
+  // colori personali
+  const cw=$('theme-colors'); cw.innerHTML='';
+  MAGS_CONFIG.MEMBER_COLORS.forEach(c=>{
+    const d=document.createElement('button'); d.className='color-dot'+(c.toLowerCase()===(state.me.color||'').toLowerCase()?' on':'');
+    d.style.background=c; d.onclick=()=>setMyTheme({ color:c });
+    cw.appendChild(d);
+  });
+}
+
+async function setMyTheme(patch){
+  const { error } = await sb.from('members').update(patch).eq('id', state.me.id);
+  if(error){ alert('Errore tema: '+error.message); return; }
+  Object.assign(state.me, patch);
+  applyMyTheme();
+  initThemePicker();
+  renderHomeMembersOnly();
 }
 
 // ============================================================
@@ -333,4 +528,5 @@ $('btn-logout').addEventListener('click', async ()=>{
 });
 
 // Via!
+applyTheme('aurora','system');  // tema neutro finché non carico il profilo
 boot();
