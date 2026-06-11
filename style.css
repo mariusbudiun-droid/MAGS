@@ -186,6 +186,12 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .schrow .sm{font-size:12px;color:var(--ink-soft);margin-top:2px;}
 .schrow .del{margin-left:auto;background:none;border:none;color:var(--ink-soft);font-size:18px;cursor:pointer;padding:0 2px;flex:none;}
 
+/* salute */
+.hr-row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:14px;}
+.hr-row .hl{color:var(--ink-soft);font-weight:600;flex:none;}
+.hr-row .hv{font-weight:700;text-align:right;}
+.hr-row .hv.mono{font-family:var(--mono);font-size:12.5px;letter-spacing:.02em;}
+
 .legend{display:flex;gap:13px;flex-wrap:wrap;margin:14px 2px 0;font-size:11px;font-weight:600;color:var(--ink-soft);}
 .legend span{display:flex;align-items:center;gap:5px;}
 .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;}

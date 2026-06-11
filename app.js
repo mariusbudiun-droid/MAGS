@@ -484,8 +484,9 @@ document.querySelectorAll('#fam-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
     document.querySelectorAll('#fam-subnav .s').forEach(x=>x.classList.remove('on'));
     s.classList.add('on');
-    ['fam-membri','fam-accessi','fam-tema'].forEach(id=>$(id).classList.remove('on'));
+    ['fam-membri','fam-salute','fam-accessi','fam-tema'].forEach(id=>$(id).classList.remove('on'));
     $(s.dataset.s).classList.add('on');
+    if(s.dataset.s==='fam-salute' && typeof openSalute==='function') openSalute();
   });
 });
 
