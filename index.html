@@ -143,11 +143,56 @@
     </div>
   </div>
 
-  <!-- ===== SOLDI (placeholder) ===== -->
+  <!-- ===== SOLDI ===== -->
   <div class="view" id="v-soldi">
     <div class="app-screen">
-      <header class="greet"><div class="kick">Soldi</div><h1>In <span class="nm">arrivo</span></h1></header>
-      <div class="card"><p class="placeholder-text">La gestione finanze arriverà più avanti.</p></div>
+      <header class="greet"><div class="kick">Soldi</div><h1>Finanze <span class="nm">famiglia</span></h1></header>
+
+      <div class="subnav" id="soldi-subnav">
+        <div class="s on" data-s="sol-pan">Panoramica</div>
+        <div class="s" data-s="sol-mov">Movimenti</div>
+        <div class="s" data-s="sol-bud">Budget</div>
+        <div class="s" data-s="sol-bol">Bollette</div>
+        <div class="s" data-s="sol-obi">Obiettivi</div>
+        <div class="s" data-s="sol-con">Conti</div>
+      </div>
+
+      <div class="sub on" id="sol-pan">
+        <div class="balance" id="sol-balance">
+          <div class="l">Saldo totale famiglia</div>
+          <div class="big" id="sol-total">€ 0</div>
+          <div class="bsub"><span>Entrate mese <b id="sol-in">€ 0</b></span><span>Uscite <b id="sol-out">€ 0</b></span></div>
+        </div>
+        <div class="sec-row"><h2>Spese per categoria</h2></div>
+        <div class="card" id="sol-bycat" style="padding:6px 16px;"></div>
+      </div>
+
+      <div class="sub" id="sol-mov">
+        <div class="sec-row"><h2>Movimenti</h2><button class="editbtn" id="sol-add-tx">+ Aggiungi</button></div>
+        <div class="card" id="sol-txlist" style="padding:6px 16px;"></div>
+      </div>
+
+      <div class="sub" id="sol-bud">
+        <div class="sec-row"><h2>Budget mensile</h2><button class="editbtn" id="sol-add-budget">+ Imposta</button></div>
+        <div class="card" id="sol-budgetlist" style="padding:16px;"></div>
+      </div>
+
+      <div class="sub" id="sol-bol">
+        <div class="sec-row"><h2>Scadenze ricorrenti</h2><button class="editbtn" id="sol-add-bill">+ Aggiungi</button></div>
+        <div class="card" id="sol-billlist" style="padding:6px 16px;"></div>
+      </div>
+
+      <div class="sub" id="sol-obi">
+        <div class="sec-row"><h2>Obiettivi di risparmio</h2><button class="editbtn" id="sol-add-goal">+ Nuovo</button></div>
+        <div class="card" id="sol-goallist" style="padding:6px 16px;"></div>
+      </div>
+
+      <div class="sub" id="sol-con">
+        <div class="sec-row"><h2>Conti</h2></div>
+        <div class="card" id="sol-accountlist" style="padding:6px 16px;"></div>
+        <div class="sec-row"><h2>Categorie</h2><button class="editbtn" id="sol-add-cat">+ Aggiungi</button></div>
+        <div class="card" id="sol-catlist" style="padding:6px 16px;"></div>
+      </div>
     </div>
   </div>
 
@@ -247,6 +292,108 @@
     </div>
   </div>
 
+  <!-- Modal movimento -->
+  <div class="modal hidden" id="tx-modal">
+    <div class="modal-card">
+      <h2 class="modal-title" id="tx-modal-title">Nuovo movimento</h2>
+      <div class="seg" id="tx-kind">
+        <button class="seg-opt on" data-k="uscita">Uscita</button>
+        <button class="seg-opt" data-k="entrata">Entrata</button>
+        <button class="seg-opt" data-k="risparmio">Ai risparmi</button>
+      </div>
+      <label class="field-label">Importo €</label>
+      <input class="field" id="tx-amount" type="number" inputmode="decimal" placeholder="0,00">
+      <label class="field-label">Descrizione</label>
+      <input class="field" id="tx-desc" placeholder="Es. Spesa supermercato">
+      <div id="tx-cat-wrap"><label class="field-label">Categoria</label>
+        <select class="field" id="tx-cat"></select></div>
+      <label class="field-label">Conto</label>
+      <select class="field" id="tx-account"></select>
+      <label class="field-label">Data</label>
+      <input class="field" id="tx-date" type="date">
+      <div id="tx-goal-wrap" style="display:none;">
+        <label class="field-label">Ripartizione obiettivi</label>
+        <p class="placeholder-text" id="tx-goal-info" style="margin-bottom:8px;">Diviso automaticamente per percentuali.</p>
+        <select class="field" id="tx-goal-mode">
+          <option value="auto">Automatico (per %)</option>
+          <option value="manuale">Tutto su un obiettivo</option>
+        </select>
+        <select class="field" id="tx-goal-target" style="display:none;margin-top:8px;"></select>
+      </div>
+      <button class="btn-primary" id="tx-save">Salva</button>
+      <button class="btn-ghost" id="tx-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="tx-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal bolletta -->
+  <div class="modal hidden" id="bill-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Scadenza ricorrente</h2>
+      <label class="field-label">Nome</label>
+      <input class="field" id="bill-name" placeholder="Es. Affitto">
+      <label class="field-label">Importo €</label>
+      <input class="field" id="bill-amount" type="number" inputmode="decimal" placeholder="0,00">
+      <label class="field-label">Frequenza</label>
+      <select class="field" id="bill-freq">
+        <option value="mensile">Mensile</option><option value="bimestrale">Bimestrale</option>
+        <option value="trimestrale">Trimestrale</option><option value="annuale">Annuale</option>
+      </select>
+      <label class="field-label">Prossima scadenza</label>
+      <input class="field" id="bill-due" type="date">
+      <button class="btn-primary" id="bill-save">Salva</button>
+      <button class="btn-ghost" id="bill-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="bill-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="bill-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal obiettivo -->
+  <div class="modal hidden" id="goal-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Obiettivo di risparmio</h2>
+      <label class="field-label">Nome</label>
+      <input class="field" id="goal-name" placeholder="Es. Vacanza estate">
+      <label class="field-label">Obiettivo €</label>
+      <input class="field" id="goal-target" type="number" inputmode="decimal" placeholder="0,00">
+      <label class="field-label">% di default sui versamenti</label>
+      <input class="field" id="goal-pct" type="number" inputmode="decimal" placeholder="0">
+      <button class="btn-primary" id="goal-save">Salva</button>
+      <button class="btn-ghost" id="goal-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="goal-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="goal-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal categoria -->
+  <div class="modal hidden" id="cat-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Categoria</h2>
+      <label class="field-label">Nome</label>
+      <input class="field" id="cat-name" placeholder="Es. Auto">
+      <label class="field-label">Emoji (facoltativo)</label>
+      <input class="field" id="cat-icon" placeholder="🚗" maxlength="2">
+      <button class="btn-primary" id="cat-save">Salva</button>
+      <button class="btn-ghost" id="cat-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
+      <button class="btn-ghost" id="cat-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="cat-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal budget -->
+  <div class="modal hidden" id="budget-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Budget categoria</h2>
+      <label class="field-label">Categoria</label>
+      <select class="field" id="budget-cat"></select>
+      <label class="field-label">Limite mensile €</label>
+      <input class="field" id="budget-limit" type="number" inputmode="decimal" placeholder="0,00">
+      <button class="btn-primary" id="budget-save">Salva</button>
+      <button class="btn-ghost" id="budget-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="budget-error"></p>
+    </div>
+  </div>
+
   <!-- tabbar -->
   <nav class="tabbar" id="tabbar">
     <div class="tab on" data-v="oggi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Oggi</div>
@@ -260,6 +407,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="famiglia.js"></script>
+<script src="casa.js"></script>
+<script src="calendario.js"></script>
+<script src="soldi.js"></script>
 <script>
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
