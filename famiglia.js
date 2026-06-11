@@ -91,17 +91,6 @@ async function updateMember(id, patch){
   // aggiorno anche la home
   renderHomeMembersOnly();
 }
-function renderHomeMembersOnly(){
-  const wrap = $('home-members'); if(!wrap) return; wrap.innerHTML='';
-  state.members.forEach(m=>{
-    const initial=(m.display_name||'?').charAt(0).toUpperCase();
-    const occ = m.is_expected ? 'in arrivo' : etichettaOcc(m.occupation);
-    const row=document.createElement('div'); row.className='mrow';
-    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
-      <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>`;
-    wrap.appendChild(row);
-  });
-}
 
 // aggiungi nuovo membro
 $('fam-add-member').addEventListener('click', async ()=>{

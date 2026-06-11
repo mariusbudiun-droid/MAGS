@@ -19,9 +19,10 @@ const state = {
   cal: {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),   // 0-11
+    weekStart: null,                // lunedì della settimana visibile 'YYYY-MM-DD'
     selDate: null,                  // 'YYYY-MM-DD'
     filterMember: 'all',            // 'all' o member.id
-    events: [],                     // eventi del mese caricati
+    events: [],                     // eventi caricati
   },
 };
 
@@ -340,24 +341,95 @@ function renderHome(){
   $('home-date').textContent = oggi.charAt(0).toUpperCase()+oggi.slice(1);
   $('home-name').textContent = state.me ? state.me.display_name : 'famiglia';
 
-  const wrap = $('home-members'); wrap.innerHTML='';
+  renderHomeMembersOnly();
+  renderFamiglia();
+  initThemePicker();
+  loadHomeExtras();
+}
+
+// statepill in base a occupazione/stato (provvisorio finché non ci sono roster/orari)
+function memberState(m){
+  if(m.is_expected) return { t:'ATTESA', c:'#22b8a6' };
+  switch(m.occupation){
+    case 'cabin_crew': return { t:'CASA', c:'#5b6cff' }; // diventerà IN VOLO con roster
+    case 'nido':
+    case 'materna':
+    case 'elementari':
+    case 'medie': return { t:'SCUOLA', c:'#ffaa3c' };
+    case 'lavoro': return { t:'LAVORO', c:'#9d7bff' };
+    default: return { t:'CASA', c:'#7a85a8' };
+  }
+}
+
+function renderHomeMembersOnly(){
+  const wrap = $('home-members'); if(!wrap) return; wrap.innerHTML='';
   state.members.forEach(m=>{
     const initial = (m.display_name||'?').charAt(0).toUpperCase();
     const occ = m.is_expected ? 'in arrivo' : etichettaOcc(m.occupation);
+    const st = memberState(m);
     const row=document.createElement('div'); row.className='mrow';
     row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
-      <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>`;
+      <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>
+      <span class="statepill" style="background:color-mix(in srgb,${st.c} 20%,transparent);color:${st.c}">${st.t}</span>`;
     wrap.appendChild(row);
   });
+}
 
-  renderFamiglia();
-  initThemePicker();
+// blocchi "Prossimi impegni" + "Questo mese"
+async function loadHomeExtras(){
+  // prossimi eventi (da oggi in avanti, max 3)
+  const today = new Date().toISOString().slice(0,10);
+  const { data: evs } = await sb.from('events')
+    .select('*').eq('household_id', state.household.id)
+    .gte('start_at', today+'T00:00:00').order('start_at').limit(3);
+  const aw=$('home-agenda');
+  if(aw){
+    aw.innerHTML='';
+    if(!evs || evs.length===0){ aw.innerHTML='<div class="ev-empty">Nessun impegno in programma.</div>'; }
+    else evs.forEach(e=>{
+      const t = e.all_day ? 'tutto il g.' : (e.start_at||'').slice(11,16);
+      const mem = state.members.find(m=>m.id===e.member_id);
+      const col = CAT_COLORS[e.category]||'var(--ink-soft)';
+      const row=document.createElement('div'); row.className='ev';
+      row.innerHTML=`<span class="time">${t}</span><span class="dot" style="background:${col}"></span>
+        <div><div class="ti">${e.title}</div><div class="meta">${[mem?mem.display_name:'',e.location].filter(Boolean).join(' · ')}</div></div>`;
+      aw.appendChild(row);
+    });
+  }
+
+  // questo mese: speso vs budget totale
+  const ym = new Date().toISOString().slice(0,7);
+  const [{ data: tx }, { data: buds }] = await Promise.all([
+    sb.from('transactions').select('amount,kind,tx_date').eq('household_id', state.household.id).gte('tx_date', ym+'-01'),
+    sb.from('budgets').select('monthly_limit').eq('household_id', state.household.id),
+  ]);
+  const speso = (tx||[]).filter(t=>t.kind==='uscita').reduce((s,t)=>s+(+t.amount||0),0);
+  const budget = (buds||[]).reduce((s,b)=>s+(+b.monthly_limit||0),0);
+  const pct = budget>0 ? Math.min(100, Math.round(speso/budget*100)) : 0;
+  const over = budget>0 && speso>budget;
+  const mw=$('home-money');
+  if(mw){
+    mw.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><div style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Speso</div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;">${eur(speso)}</div></div>
+        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Budget</div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;color:${over?'#e23b5a':'#1fb46b'};">${budget>0?eur(budget):'—'}</div></div>
+      </div>
+      ${budget>0?`<div class="bar" style="margin-top:12px;"><i style="width:${pct}%;background:${over?'#e23b5a':'var(--accent)'};"></i></div>`:''}`;
+  }
 }
 
 function etichettaOcc(o){
   const map={nessuna:'—',nido:'Nido',materna:'Materna',elementari:'Elementari',medie:'Medie',lavoro:'Lavoro',cabin_crew:'Cabin crew'};
   return map[o]||o;
 }
+
+// scorciatoie dai blocchi home
+document.addEventListener('click', (e)=>{
+  if(e.target.id==='home-goto-cal'){ document.querySelector('#tabbar .tab[data-v="cal"]').click(); }
+  if(e.target.id==='home-goto-soldi'){ document.querySelector('#tabbar .tab[data-v="soldi"]').click(); }
+});
 
 // ---- navigazione tab principali ----
 document.querySelectorAll('#tabbar .tab').forEach(t=>{

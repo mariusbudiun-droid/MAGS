@@ -87,29 +87,35 @@
         <h1>Ciao <span class="nm" id="home-name">—</span></h1>
       </header>
       <div class="card" id="home-members"></div>
+
+      <div class="sec-row"><h2>Prossimi impegni</h2><button class="editbtn" id="home-goto-cal">Tutto →</button></div>
+      <div class="card" id="home-agenda" style="padding:6px 16px;"></div>
+
+      <div class="sec-row"><h2>Questo mese</h2><button class="editbtn" id="home-goto-soldi">Soldi →</button></div>
+      <div class="card pad" id="home-money" style="padding:16px;"></div>
     </div>
   </div>
 
   <!-- ===== CALENDARIO ===== -->
   <div class="view" id="v-cal">
     <div class="app-screen">
-      <header class="greet"><div class="kick" id="cal-monthlabel">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></header>
+      <header class="greet"><div class="kick">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></header>
 
       <div class="filter" id="cal-filter"></div>
 
-      <div class="cal-head">
-        <button class="cal-nav" id="cal-prev">‹</button>
-        <div class="cal-month" id="cal-monthname">—</div>
-        <button class="cal-nav" id="cal-next">›</button>
-      </div>
-      <div class="cal-grid" id="cal-grid"></div>
-
-      <div class="legend">
+      <div class="legend" style="margin:0 2px 12px;">
         <span><i style="background:var(--accent)"></i>Lavoro</span>
         <span><i style="background:#ffaa3c"></i>Scuola</span>
         <span><i style="background:#9d7bff"></i>Appuntamento</span>
         <span><i style="background:#22b8a6"></i>Salute</span>
       </div>
+
+      <div class="cal-head">
+        <button class="cal-nav" id="cal-prev">‹</button>
+        <div class="cal-month" id="cal-weeklabel">—</div>
+        <button class="cal-nav" id="cal-next">›</button>
+      </div>
+      <div class="week" id="cal-week"></div>
 
       <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
       <div class="card" id="cal-events" style="padding:6px 16px;"></div>

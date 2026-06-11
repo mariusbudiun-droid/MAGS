@@ -12,31 +12,41 @@ function todayYmd(){ const n=new Date(); return ymd(n.getFullYear(), n.getMonth(
 
 async function openCalendar(){
   if(!state.cal.selDate) state.cal.selDate = todayYmd();
+  if(!state.cal.weekStart) state.cal.weekStart = mondayOf(state.cal.selDate);
   renderCalFilter();
-  await loadMonthEvents();
-  renderCalGrid();
+  await loadWeekEvents();
+  renderWeek();
   renderDayAgenda();
+}
+
+// lunedì della settimana che contiene dateStr
+function mondayOf(dateStr){
+  const d = new Date(dateStr+'T12:00:00');
+  let dow = d.getDay(); dow = (dow===0)?6:dow-1; // lun=0
+  d.setDate(d.getDate()-dow);
+  return ymd(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function addDays(dateStr, n){
+  const d=new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n);
+  return ymd(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
 function renderCalFilter(){
   const wrap=$('cal-filter'); wrap.innerHTML='';
-  const mk=(id,label,color)=>{
+  const mk=(id,label)=>{
     const p=document.createElement('div');
     p.className='fpill'+(state.cal.filterMember===id?' on':'');
     p.textContent=label;
-    if(color && state.cal.filterMember===id) p.style.cssText='';
-    p.onclick=()=>{ state.cal.filterMember=id; renderCalFilter(); renderCalGrid(); renderDayAgenda(); };
+    p.onclick=()=>{ state.cal.filterMember=id; renderCalFilter(); renderWeek(); renderDayAgenda(); };
     wrap.appendChild(p);
   };
   mk('all','Tutti');
-  state.members.forEach(m=> mk(m.id, m.display_name, m.color));
+  state.members.forEach(m=> mk(m.id, m.display_name));
 }
 
-async function loadMonthEvents(){
-  const { year, month } = state.cal;
-  const start = `${year}-${pad(month+1)}-01`;
-  const endDate = new Date(year, month+1, 1);
-  const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-01`;
+async function loadWeekEvents(){
+  const start = state.cal.weekStart;
+  const end = addDays(start, 7);
   const { data, error } = await sb.from('events')
     .select('*')
     .eq('household_id', state.household.id)
@@ -56,34 +66,30 @@ function eventsForDay(dateStr){
   }).sort((a,b)=> (a.start_at||'').localeCompare(b.start_at||''));
 }
 
-function renderCalGrid(){
-  const { year, month } = state.cal;
-  $('cal-monthname').textContent = `${MONTHS_IT[month]} ${year}`;
-  $('cal-title').innerHTML = `${MONTHS_IT[month].charAt(0).toUpperCase()+MONTHS_IT[month].slice(1)} <span class="nm">${year}</span>`;
+function renderWeek(){
+  const start = state.cal.weekStart;
+  const startObj = new Date(start+'T12:00:00');
+  const endObj = new Date(addDays(start,6)+'T12:00:00');
+  // etichetta intervallo + titolo mese
+  const mese = MONTHS_IT[startObj.getMonth()];
+  $('cal-title').innerHTML = `${mese.charAt(0).toUpperCase()+mese.slice(1)} <span class="nm">${startObj.getFullYear()}</span>`;
+  const sameMonth = startObj.getMonth()===endObj.getMonth();
+  $('cal-weeklabel').textContent = sameMonth
+    ? `${startObj.getDate()}–${endObj.getDate()} ${MONTHS_IT[startObj.getMonth()].slice(0,3)}`
+    : `${startObj.getDate()} ${MONTHS_IT[startObj.getMonth()].slice(0,3)} – ${endObj.getDate()} ${MONTHS_IT[endObj.getMonth()].slice(0,3)}`;
 
-  const grid=$('cal-grid'); grid.innerHTML='';
-  DOW_IT.forEach(d=>{ const e=document.createElement('div'); e.className='cal-dow'; e.textContent=d; grid.appendChild(e); });
-
-  const first = new Date(year, month, 1);
-  let startDow = first.getDay(); // 0=dom
-  startDow = (startDow===0)?6:startDow-1; // lun=0
-  const daysInMonth = new Date(year, month+1, 0).getDate();
-
-  for(let i=0;i<startDow;i++){ const e=document.createElement('div'); e.className='cal-cell empty'; grid.appendChild(e); }
-
-  for(let d=1; d<=daysInMonth; d++){
-    const dateStr = ymd(year, month, d);
-    const cell=document.createElement('div');
-    cell.className='cal-cell';
-    if(dateStr===todayYmd()) cell.classList.add('today');
+  const wrap=$('cal-week'); wrap.innerHTML='';
+  for(let i=0;i<7;i++){
+    const dateStr = addDays(start, i);
+    const d = new Date(dateStr+'T12:00:00');
+    const cell=document.createElement('div'); cell.className='wday';
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
-
-    const evs = eventsForDay(dateStr);
-    const cats = [...new Set(evs.map(e=>e.category))].slice(0,4);
-    const pips = cats.map(c=>`<span class="dpip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
-    cell.innerHTML = `<span class="dnum">${d}</span><span class="dpips">${pips}</span>`;
-    cell.onclick=()=>{ state.cal.selDate=dateStr; renderCalGrid(); renderDayAgenda(); };
-    grid.appendChild(cell);
+    const evs=eventsForDay(dateStr);
+    const cats=[...new Set(evs.map(e=>e.category))].slice(0,3);
+    const pips=cats.map(c=>`<span class="wpip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
+    cell.innerHTML=`<span class="wn">${DOW_IT[i]}</span><span class="wd">${d.getDate()}</span><span class="wpips">${pips}</span>`;
+    cell.onclick=()=>{ state.cal.selDate=dateStr; renderWeek(); renderDayAgenda(); };
+    wrap.appendChild(cell);
   }
 }
 
@@ -110,14 +116,14 @@ function renderDayAgenda(){
   });
 }
 
-// nav mesi
+// nav settimane
 $('cal-prev').addEventListener('click', async ()=>{
-  state.cal.month--; if(state.cal.month<0){ state.cal.month=11; state.cal.year--; }
-  await loadMonthEvents(); renderCalGrid(); renderDayAgenda();
+  state.cal.weekStart = addDays(state.cal.weekStart, -7);
+  await loadWeekEvents(); renderWeek(); renderDayAgenda();
 });
 $('cal-next').addEventListener('click', async ()=>{
-  state.cal.month++; if(state.cal.month>11){ state.cal.month=0; state.cal.year++; }
-  await loadMonthEvents(); renderCalGrid(); renderDayAgenda();
+  state.cal.weekStart = addDays(state.cal.weekStart, 7);
+  await loadWeekEvents(); renderWeek(); renderDayAgenda();
 });
 
 // ---- modal evento ----
@@ -184,11 +190,10 @@ $('ev-save').addEventListener('click', async ()=>{
   if(error){ showError('ev-error','Errore: '+error.message); return; }
 
   closeEventModal();
-  // se l'evento è in un altro mese, spostati lì
-  const evMonth = parseInt(date.slice(5,7))-1, evYear=parseInt(date.slice(0,4));
-  if(evMonth!==state.cal.month || evYear!==state.cal.year){ state.cal.month=evMonth; state.cal.year=evYear; }
+  // porta la vista alla settimana dell'evento e seleziona il giorno
   state.cal.selDate = date;
-  await loadMonthEvents(); renderCalGrid(); renderDayAgenda();
+  state.cal.weekStart = mondayOf(date);
+  await loadWeekEvents(); renderWeek(); renderDayAgenda();
 });
 
 $('ev-delete').addEventListener('click', async ()=>{
@@ -196,7 +201,7 @@ $('ev-delete').addEventListener('click', async ()=>{
   const { error } = await sb.from('events').delete().eq('id', editingEventId);
   if(error){ showError('ev-error','Errore: '+error.message); return; }
   closeEventModal();
-  await loadMonthEvents(); renderCalGrid(); renderDayAgenda();
+  await loadWeekEvents(); renderWeek(); renderDayAgenda();
 });
 
 // ============================================================
