@@ -114,25 +114,63 @@ function renderMovimenti(){
   });
 }
 
-// ---------- BUDGET (buste) ----------
+// ---------- BUSTE (ex budget) ----------
 function renderBudget(){
   const wrap=$('sol-budgetlist'); wrap.innerHTML='';
-  if(soldi.budgets.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna busta. Tocca + Imposta per crearne una.</div>'; return; }
+  if(soldi.budgets.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna busta. Tocca + Nuova per crearne una.</div>'; return; }
   soldi.budgets.forEach(b=>{
     const c=catById(b.category_id);
     const col=catColor(c);
     const bal=+b.balance||0;
     const limit=+b.monthly_limit||0;
-    const usato=Math.max(0, limit-bal);            // quanto è stato speso dalla busta
+    const usato=Math.max(0, limit-bal);
     const pct=limit>0?Math.min(100,Math.round(usato/limit*100)):0;
     const vuota=bal<=0;
     const item=document.createElement('div'); item.className='budget-item';
-    item.innerHTML=`<div class="bh"><span>${c?.icon||''} ${c?c.name:'?'}</span>
+    item.innerHTML=`<div class="bh"><span>${c?.icon||'🧧'} ${c?c.name:'?'}</span>
       <span class="amt">${eur(bal)} <span style="color:var(--ink-soft);font-weight:600">disp.</span></span></div>
       <div class="bar"><i style="width:${pct}%;background:${vuota?'#e23b5a':col}"></i></div>
-      <div class="bsub">nella busta ${eur(bal)} di ${eur(limit)}</div>`;
+      <div class="bsub">nella busta ${eur(bal)} di ${eur(limit)} · tocca per gestire</div>`;
+    item.style.cursor='pointer';
+    item.onclick=()=>manageBusta(b);
     wrap.appendChild(item);
   });
+}
+
+async function manageBusta(b){
+  const c=catById(b.category_id);
+  const bal=+b.balance||0;
+  const azione = prompt(`Busta "${c?c.name:'?'}" (${eur(bal)} dentro).\n\nScrivi:\n• un importo da AGGIUNGERE dal conto (es. 100)\n• "-" seguito da importo per TOGLIERE e rimettere nel conto (es. -50)\n• "x" per eliminare la busta e rimettere tutto nel conto`);
+  if(azione===null) return;
+  const corrente=soldi.accounts.find(a=>a.kind==='comune')||soldi.accounts[0];
+  const hid=state.household.id;
+
+  try{
+    if(azione.trim().toLowerCase()==='x'){
+      // elimina busta, soldi tornano al conto
+      if(corrente && bal>0){
+        await sb.from('accounts').update({ balance:(+corrente.balance||0)+bal }).eq('id', corrente.id);
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:bal, from_budget:b.id, to_account:corrente.id, description:`Chiusura busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+      }
+      await sb.from('budgets').delete().eq('id', b.id);
+    } else {
+      const val=parseFloat(azione.replace(',','.'));
+      if(isNaN(val)||val===0) return;
+      // val>0: aggiungi dal conto alla busta; val<0: togli dalla busta al conto
+      const amt=Math.abs(val);
+      if(val>0){
+        await sb.from('budgets').update({ balance:bal+amt, monthly_limit:(+b.monthly_limit||0)+amt }).eq('id', b.id);
+        if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)-amt }).eq('id', corrente.id);
+          await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:amt, from_account:corrente.id, to_budget:b.id, description:`Aggiunta busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
+      } else {
+        const tolto=Math.min(amt, bal);
+        await sb.from('budgets').update({ balance:bal-tolto }).eq('id', b.id);
+        if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)+tolto }).eq('id', corrente.id);
+          await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:tolto, from_budget:b.id, to_account:corrente.id, description:`Prelievo busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
+      }
+    }
+    await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica();
+  }catch(err){ alert('Errore: '+(err.message||err)); }
 }
 
 // ---------- BOLLETTE ----------
@@ -377,52 +415,59 @@ $('cat-save').addEventListener('click', async ()=>{
 });
 
 // ============================================================
-// MODAL BUDGET
+// MODAL BUSTA (ex budget)
 // ============================================================
+const BUDGET_EMOJIS = ['🛒','🏠','💡','🚗','👶','🎉','🍕','✈️','💊','🎁','👕','📚','🐶','💰'];
+let budgetEmoji = '🛒';
 $('sol-add-budget').addEventListener('click', ()=>{
-  $('budget-cat').innerHTML = soldi.categories.map(c=>`<option value="${c.id}">${c.icon||''} ${c.name}</option>`).join('');
-  $('budget-limit').value=''; clearError('budget-error'); $('budget-modal').classList.remove('hidden');
+  budgetEmoji='🛒';
+  $('budget-name').value='';
+  $('budget-limit').value='';
+  const ep=$('budget-emoji');
+  ep.innerHTML = BUDGET_EMOJIS.map(e=>`<span class="emo${e===budgetEmoji?' on':''}" data-e="${e}">${e}</span>`).join('');
+  ep.querySelectorAll('.emo').forEach(el=>{
+    el.onclick=()=>{ ep.querySelectorAll('.emo').forEach(x=>x.classList.remove('on')); el.classList.add('on'); budgetEmoji=el.dataset.e; };
+  });
+  clearError('budget-error');
+  $('budget-modal').classList.remove('hidden');
 });
 $('budget-cancel').addEventListener('click', ()=>$('budget-modal').classList.add('hidden'));
 $('budget-modal').addEventListener('click', e=>{ if(e.target.id==='budget-modal') $('budget-modal').classList.add('hidden'); });
 $('budget-save').addEventListener('click', async ()=>{
-  const cat=$('budget-cat').value;
+  clearError('budget-error');
+  const name=$('budget-name').value.trim();
   const limit=parseFloat(($('budget-limit').value||'').replace(',','.'));
-  if(!cat||!(limit>0)){ showError('budget-error','Categoria e limite richiesti.'); return; }
+  if(!name){ showError('budget-error','Dai un nome alla busta.'); return; }
+  if(!(limit>0)){ showError('budget-error','Inserisci quanto metterci dentro.'); return; }
   const hid=state.household.id;
   const corrente=soldi.accounts.find(a=>a.kind==='comune')||soldi.accounts[0];
-  const existing=soldi.budgets.find(b=>b.category_id===cat);
 
   try{
-    if(existing){
-      // modifica budget: aggiusta la busta della differenza, spostando da/verso il corrente
-      const oldBal=+existing.balance||0;
-      const diff = limit - (+existing.monthly_limit||0); // quanto aggiungo/tolgo alla busta
-      await sb.from('budgets').update({ monthly_limit:limit, balance: Math.max(0, oldBal+diff) }).eq('id', existing.id);
-      if(corrente && diff!==0){
-        await sb.from('accounts').update({ balance:(+corrente.balance||0)-diff }).eq('id', corrente.id);
-        await sb.from('transactions').insert({
-          household_id:hid, kind:'giroconto', amount:Math.abs(diff),
-          from_account: diff>0?corrente.id:null, to_budget: diff>0?existing.id:null,
-          from_budget: diff<0?existing.id:null, to_account: diff<0?corrente.id:null,
-          description:`Budget ${catById(cat)?.name||''}`, tx_date:new Date().toISOString().slice(0,10),
-          member_id: state.me?state.me.id:null
-        });
-      }
-    } else {
-      // nuovo budget: riempi la busta col limite, togliendo dal corrente
-      const { data: bud } = await sb.from('budgets').insert({ household_id:hid, category_id:cat, monthly_limit:limit, balance:limit }).select().single();
-      if(corrente){
-        await sb.from('accounts').update({ balance:(+corrente.balance||0)-limit }).eq('id', corrente.id);
-        await sb.from('transactions').insert({
-          household_id:hid, kind:'giroconto', amount:limit,
-          from_account:corrente.id, to_budget:bud?.id||null,
-          description:`Budget ${catById(cat)?.name||''}`, tx_date:new Date().toISOString().slice(0,10),
-          member_id: state.me?state.me.id:null
-        });
-      }
+    // crea (o riusa) la categoria con lo stesso nome
+    let cat = soldi.categories.find(c=>c.name.toLowerCase()===name.toLowerCase());
+    if(!cat){
+      const { data: newCat, error: ce } = await sb.from('categories').insert({
+        household_id:hid, name, icon:budgetEmoji, kind:'spesa'
+      }).select().single();
+      if(ce) throw ce;
+      cat=newCat;
     }
-    $('budget-modal').classList.add('hidden'); await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica();
+    // crea la busta (budget) e riempila dal conto comune
+    const { data: bud, error: be } = await sb.from('budgets').insert({
+      household_id:hid, category_id:cat.id, monthly_limit:limit, balance:limit
+    }).select().single();
+    if(be) throw be;
+    if(corrente){
+      await sb.from('accounts').update({ balance:(+corrente.balance||0)-limit }).eq('id', corrente.id);
+      await sb.from('transactions').insert({
+        household_id:hid, kind:'giroconto', amount:limit,
+        from_account:corrente.id, to_budget:bud.id,
+        description:`Busta ${name}`, tx_date:new Date().toISOString().slice(0,10),
+        member_id: state.me?state.me.id:null
+      });
+    }
+    $('budget-modal').classList.add('hidden');
+    await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica(); renderCategorie();
   }catch(err){ showError('budget-error','Errore: '+(err.message||err)); }
 });
 

@@ -205,7 +205,7 @@
       <div class="subnav" id="soldi-subnav">
         <div class="s on" data-s="sol-pan">Panoramica</div>
         <div class="s" data-s="sol-mov">Movimenti</div>
-        <div class="s" data-s="sol-bud">Budget</div>
+        <div class="s" data-s="sol-bud">Buste</div>
         <div class="s" data-s="sol-bol">Bollette</div>
         <div class="s" data-s="sol-obi">Obiettivi</div>
         <div class="s" data-s="sol-con">Conti</div>
@@ -227,7 +227,7 @@
       </div>
 
       <div class="sub" id="sol-bud">
-        <div class="sec-row"><h2>Budget mensile</h2><button class="editbtn" id="sol-add-budget">+ Imposta</button></div>
+        <div class="sec-row"><h2>Buste</h2><button class="editbtn" id="sol-add-budget">+ Nuova</button></div>
         <div class="card" id="sol-budgetlist" style="padding:16px;"></div>
       </div>
 
@@ -514,12 +514,14 @@
   <!-- Modal budget -->
   <div class="modal hidden" id="budget-modal">
     <div class="modal-card">
-      <h2 class="modal-title">Budget categoria</h2>
-      <label class="field-label">Categoria</label>
-      <select class="field" id="budget-cat"></select>
-      <label class="field-label">Limite mensile €</label>
+      <h2 class="modal-title">Nuova busta</h2>
+      <label class="field-label">Nome busta</label>
+      <input class="field" id="budget-name" placeholder="Es. Spesa, Bollette, Benzina">
+      <label class="field-label">Emoji</label>
+      <div class="emojipick" id="budget-emoji"></div>
+      <label class="field-label">Quanto metterci dentro €</label>
       <input class="field" id="budget-limit" type="number" inputmode="decimal" placeholder="0,00">
-      <button class="btn-primary" id="budget-save">Salva</button>
+      <button class="btn-primary" id="budget-save">Crea busta</button>
       <button class="btn-ghost" id="budget-cancel" style="margin-top:8px;">Annulla</button>
       <p class="auth-error hidden" id="budget-error"></p>
     </div>
