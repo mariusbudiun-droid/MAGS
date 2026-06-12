@@ -72,6 +72,20 @@ function renderItems(items){
     };
     wrap.appendChild(row);
   });
+
+  // pulsante "elimina comprati" se c'è almeno uno spuntato
+  const checkedCount = items.filter(it=>it.checked).length;
+  if(checkedCount>0){
+    const clr=document.createElement('button');
+    clr.className='clear-checked';
+    clr.textContent=`Elimina comprati (${checkedCount})`;
+    clr.onclick=async ()=>{
+      if(!confirm(`Eliminare ${checkedCount} articoli già comprati?`)) return;
+      await sb.from('shopping_items').delete().eq('list_id', casaState.currentList).eq('checked', true);
+      loadItems();
+    };
+    wrap.appendChild(clr);
+  }
 }
 
 async function addItem(){
@@ -85,6 +99,100 @@ async function addItem(){
 }
 $('casa-additem').addEventListener('click', addItem);
 $('casa-newitem').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
+
+// ---- impostazioni lista: categoria (budget) + conto ----
+async function openListConfig(){
+  if(!casaState.currentList){ return; }
+  const list = casaState.lists.find(l=>l.id===casaState.currentList);
+  // carica categorie di uscita e conti
+  const [{ data: cats }, { data: accs }] = await Promise.all([
+    sb.from('categories').select('*').eq('household_id', state.household.id).order('name'),
+    sb.from('accounts').select('*').eq('household_id', state.household.id).order('name'),
+  ]);
+  const catSel=$('lc-category');
+  catSel.innerHTML = `<option value="">— nessuna —</option>` +
+    (cats||[]).map(c=>`<option value="${c.id}"${list.category_id===c.id?' selected':''}>${c.icon?c.icon+' ':''}${c.name}</option>`).join('') +
+    `<option value="__new__">+ Nuova categoria…</option>`;
+  const accSel=$('lc-account');
+  accSel.innerHTML = (accs||[]).map(a=>`<option value="${a.id}"${list.account_id===a.id?' selected':''}>${a.name}</option>`).join('');
+  clearError('lc-error');
+  $('listcfg-modal').classList.remove('hidden');
+}
+$('lista-config').addEventListener('click', openListConfig);
+$('lc-cancel').addEventListener('click', ()=>$('listcfg-modal').classList.add('hidden'));
+$('listcfg-modal').addEventListener('click', e=>{ if(e.target.id==='listcfg-modal') $('listcfg-modal').classList.add('hidden'); });
+
+// creazione categoria al volo
+$('lc-category').addEventListener('change', async (e)=>{
+  if(e.target.value!=='__new__') return;
+  const name=prompt('Nome della nuova categoria di spesa:');
+  if(!name){ e.target.value=''; return; }
+  const { data } = await sb.from('categories').insert({
+    household_id:state.household.id, name:name.trim(), kind:'uscita', icon:'🛒'
+  }).select().single();
+  if(data){
+    const opt=document.createElement('option');
+    opt.value=data.id; opt.textContent='🛒 '+data.name; opt.selected=true;
+    e.target.insertBefore(opt, e.target.querySelector('option[value="__new__"]'));
+  } else { e.target.value=''; }
+});
+
+$('lc-save').addEventListener('click', async ()=>{
+  const cat=$('lc-category').value;
+  const acc=$('lc-account').value;
+  const patch = {
+    category_id: (cat && cat!=='__new__') ? cat : null,
+    account_id: acc || null,
+  };
+  const { error } = await sb.from('shopping_lists').update(patch).eq('id', casaState.currentList);
+  if(error){ showError('lc-error','Errore: '+error.message); return; }
+  // aggiorna in memoria
+  const list = casaState.lists.find(l=>l.id===casaState.currentList);
+  if(list){ list.category_id=patch.category_id; list.account_id=patch.account_id; }
+  $('listcfg-modal').classList.add('hidden');
+});
+
+// ---- spesa fatta ----
+$('spesa-fatta').addEventListener('click', ()=>{
+  if(!casaState.currentList) return;
+  $('sf-amount').value='';
+  clearError('sf-error');
+  $('spesafatta-modal').classList.remove('hidden');
+});
+$('sf-cancel').addEventListener('click', ()=>$('spesafatta-modal').classList.add('hidden'));
+$('spesafatta-modal').addEventListener('click', e=>{ if(e.target.id==='spesafatta-modal') $('spesafatta-modal').classList.add('hidden'); });
+
+$('sf-save').addEventListener('click', async ()=>{
+  clearError('sf-error');
+  const raw = ($('sf-amount').value||'').replace(',','.');
+  const amount = parseFloat(raw);
+  if(isNaN(amount) || amount<=0){ showError('sf-error','Inserisci un importo valido.'); return; }
+  const list = casaState.lists.find(l=>l.id===casaState.currentList);
+
+  // registra la transazione SOLO se la lista ha categoria e conto collegati
+  if(list.category_id && list.account_id){
+    const { error: txErr } = await sb.from('transactions').insert({
+      household_id: state.household.id,
+      account_id: list.account_id,
+      category_id: list.category_id,
+      member_id: state.me ? state.me.id : null,
+      kind: 'uscita',
+      amount,
+      description: `Spesa · ${list.name}`,
+      tx_date: new Date().toISOString().slice(0,10),
+    });
+    if(txErr){ showError('sf-error','Errore registrazione: '+txErr.message); return; }
+  } else {
+    showError('sf-error','Collega prima categoria e conto con ⚙︎');
+    return;
+  }
+
+  // cancella gli articoli spuntati, lascia i non presi
+  await sb.from('shopping_items').delete().eq('list_id', casaState.currentList).eq('checked', true);
+  $('spesafatta-modal').classList.add('hidden');
+  loadItems();
+});
+
 
 // ---- import lista spesa da screenshot ----
 let spesaItems = null;

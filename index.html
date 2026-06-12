@@ -180,6 +180,10 @@
           <input class="field" id="casa-newitem" placeholder="Aggiungi un articolo…">
           <button class="add-btn" id="casa-additem">+</button>
         </div>
+        <div class="spesa-actions">
+          <button class="btn-primary" id="spesa-fatta">✓ Spesa fatta</button>
+          <button class="btn-ghost" id="lista-config" title="Impostazioni lista">⚙︎</button>
+        </div>
         <button class="btn-ghost" id="spesa-pick" style="margin-top:10px;">📷 Importa da foto</button>
         <input type="file" id="spesa-file" accept="image/*" style="display:none;">
         <div id="spesa-status"></div>
@@ -381,6 +385,33 @@
   </div>
 
   <!-- Modal modifica casella menù -->
+  <!-- Modal impostazioni lista (categoria + conto) -->
+  <div class="modal hidden" id="listcfg-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Impostazioni lista</h2>
+      <label class="field-label">Budget / categoria su cui scalare</label>
+      <select class="field" id="lc-category"></select>
+      <label class="field-label">Conto da cui esce la spesa</label>
+      <select class="field" id="lc-account"></select>
+      <button class="btn-primary" id="lc-save">Salva</button>
+      <button class="btn-ghost" id="lc-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="lc-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal spesa fatta (importo) -->
+  <div class="modal hidden" id="spesafatta-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Spesa fatta</h2>
+      <p style="font-size:13px;color:var(--ink-soft);margin:0 0 12px;">Quanto hai speso? Verrà registrato come uscita e gli articoli comprati saranno rimossi dalla lista.</p>
+      <label class="field-label">Importo speso (€)</label>
+      <input class="field" id="sf-amount" type="number" inputmode="decimal" placeholder="0,00">
+      <button class="btn-primary" id="sf-save">Registra e pulisci</button>
+      <button class="btn-ghost" id="sf-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="sf-error"></p>
+    </div>
+  </div>
+
   <div class="modal hidden" id="menu-modal">
     <div class="modal-card">
       <h2 class="modal-title" id="menu-modal-title">Modifica pasto</h2>
