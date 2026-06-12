@@ -63,7 +63,10 @@ function memberInitial(memberId){
 // costruisce le pastiglie iniziale+categoria di un giorno
 function dayChips(evs, max){
   const chips = evs.map(e=>{
-    const ini = e.member_id ? memberInitial(e.member_id) : '·';
+    // eventi "famiglia" senza persona → simbolo dedicato
+    let ini;
+    if(e.category==='famiglia' && !e.member_id) ini='♡';
+    else ini = e.member_id ? memberInitial(e.member_id) : '·';
     const col = CAT_COLORS[e.category]||'var(--ink-soft)';
     return `<span class="daychip" style="background:${col}">${ini}</span>`;
   });
@@ -188,11 +191,18 @@ function renderDayAgenda(){
     const t = e.all_day ? 'tutto il giorno' : (e.start_at||'').slice(11,16);
     const mem = state.members.find(m=>m.id===e.member_id);
     const memName = mem ? mem.display_name : '';
+    // estrai CI/CO dalla nota (voli da roster)
+    let cico = '';
+    if(e.note){
+      const m = e.note.match(/CI:\s*([0-9:—]+)\s+CO:\s*([0-9:—]+)/);
+      if(m) cico = `CI ${m[1]} · CO ${m[2]}`;
+    }
     const row=document.createElement('div'); row.className='ev';
     row.innerHTML = `<span class="time">${t}</span>
       <span class="dot" style="background:${CAT_COLORS[e.category]||'var(--ink-soft)'}"></span>
       <div><div class="ti">${e.title}</div>
-      <div class="meta">${[memName, CAT_LABELS[e.category], e.location].filter(Boolean).join(' · ')}</div></div>`;
+      <div class="meta">${[memName, CAT_LABELS[e.category], e.location].filter(Boolean).join(' · ')}</div>
+      ${cico?`<div class="meta meta-cico">${cico}</div>`:''}</div>`;
     row.onclick=()=>openEventModal(e);
     wrap.appendChild(row);
   });
@@ -399,16 +409,21 @@ function dutyDescription(d){
   }
   return DUTY_LABELS[d.type] || (d.assignment||'Duty');
 }
-// rotta compatta: NRN-AHO-NRN (catena degli aeroporti senza ripetere)
+// rotta compatta: solo le destinazioni (esclude la base PSR). Es: STN · TPS
+const HOME_BASE = 'PSR';
 function flightRoute(d){
   if(!d.flights?.length) return '';
+  // raccogli tutti gli aeroporti toccati, in ordine
   const seq=[];
   d.flights.forEach(f=>{
-    if(seq.length===0) seq.push(f.from);
     if(seq[seq.length-1]!==f.from) seq.push(f.from);
     seq.push(f.to);
   });
-  return seq.join('-');
+  // tieni solo le destinazioni diverse dalla base, senza ripetizioni consecutive
+  const dests = seq.filter(a=>a && a!==HOME_BASE);
+  const uniq=[];
+  dests.forEach(a=>{ if(uniq[uniq.length-1]!==a) uniq.push(a); });
+  return uniq.length ? uniq.join(' · ') : seq.join('-');
 }
 // aggiunge/sottrae minuti a "HH:MM" → "HH:MM"
 function shiftHHMM(hhmm, deltaMin){

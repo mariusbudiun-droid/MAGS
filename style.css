@@ -180,6 +180,7 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .mg-chips{display:flex;flex-wrap:wrap;gap:2px;justify-content:center;align-content:flex-start;}
 .daychip{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:9px;font-weight:800;line-height:1;color:#fff;font-family:var(--mono);}
 .daychip.more{background:var(--surface2)!important;color:var(--ink-soft);font-size:8px;}
+.meta-cico{font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:1px;}
 .legend-people span b.lp-ini{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:#fff;font-size:9px;font-weight:800;margin-right:5px;font-family:var(--mono);}
 .emojipick{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px;}
 .emojipick .emo{width:40px;height:40px;display:grid;place-items:center;font-size:20px;border-radius:11px;background:var(--surface2);border:1.5px solid var(--line);cursor:pointer;}
