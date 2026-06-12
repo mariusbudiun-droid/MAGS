@@ -182,6 +182,14 @@ $('sf-save').addEventListener('click', async ()=>{
       tx_date: new Date().toISOString().slice(0,10),
     });
     if(txErr){ showError('sf-error','Errore registrazione: '+txErr.message); return; }
+
+    // scala dalla busta (budget) collegata a quella categoria, se esiste
+    const { data: bud } = await sb.from('budgets').select('*')
+      .eq('household_id', state.household.id).eq('category_id', list.category_id).maybeSingle();
+    if(bud){
+      const nuovo = Math.max(0, (+bud.balance||0) - amount);
+      await sb.from('budgets').update({ balance: nuovo }).eq('id', bud.id);
+    }
   } else {
     showError('sf-error','Collega prima categoria e conto con ⚙︎');
     return;

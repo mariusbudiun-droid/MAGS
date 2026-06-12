@@ -3,6 +3,17 @@
 // Schermate: loading -> login -> (setup primo avvio) -> home
 // ============================================================
 
+// blocca il pinch-zoom e il doppio-tap-zoom su iOS Safari
+document.addEventListener('gesturestart', e=>e.preventDefault());
+document.addEventListener('gesturechange', e=>e.preventDefault());
+document.addEventListener('gestureend', e=>e.preventDefault());
+let _lastTouch=0;
+document.addEventListener('touchend', e=>{
+  const now=Date.now();
+  if(now-_lastTouch<=300){ e.preventDefault(); }
+  _lastTouch=now;
+}, {passive:false});
+
 // Client Supabase puntato allo schema dedicato mags_app
 const sb = supabase.createClient(
   MAGS_CONFIG.SUPABASE_URL,
@@ -499,6 +510,7 @@ document.querySelectorAll('#tabbar .tab').forEach(t=>{
     if(t.dataset.v === 'cal') openCalendar();
     if(t.dataset.v === 'casa') openCasa();
     if(t.dataset.v === 'soldi') openSoldi();
+    if(t.dataset.v === 'home') renderHome();
     window.scrollTo({top:0,behavior:'smooth'});
   });
 });

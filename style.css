@@ -3,6 +3,11 @@
    data-fam = soft|aurora|linen|cockpit ; data-lum = light|dark
    ============================================================ */
 
+/* blocca zoom/gesti di pinch e doppio-tap su iOS */
+html{ -webkit-text-size-adjust:100%; text-size-adjust:100%; touch-action:pan-y; }
+*{ -webkit-touch-callout:none; }
+input,textarea,select{ font-size:16px; } /* evita lo zoom automatico iOS sui campi */
+
 /* ---- AURORA (default) ---- */
 body[data-fam="aurora"]{ --display:'Sora',sans-serif; --body:'Sora',sans-serif; --mono:'Space Mono',monospace; --radius:20px; --av-r:16px; --pill:30px;
   --accent:#5b6cff; --accent-2:#22b8a6; --grad:linear-gradient(135deg,#5b6cff,#22b8a6); }
@@ -312,6 +317,7 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .budget-item{padding:10px 0;}
 .budget-item .bh{display:flex;justify-content:space-between;font-weight:700;font-size:14px;}
 .budget-item .bh .amt{font-family:var(--mono);font-size:13px;}
+.budget-item .bsub{font-size:11px;color:var(--ink-soft);margin-top:5px;font-family:var(--mono);}
 
 .bill{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line-soft);cursor:pointer;}
 .bill:last-child{border-bottom:none;}
