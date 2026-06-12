@@ -92,7 +92,7 @@ function renderMonth(){
     if(dateStr===todayYmd()) cell.classList.add('today');
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
     const evs=eventsForDay(dateStr);
-    cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,4)}</span>`;
+    cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
     grid.appendChild(cell);
   }

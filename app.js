@@ -429,20 +429,52 @@ function memberState(m){
 
 function renderHomeMembersOnly(){
   const wrap = $('home-members'); if(!wrap) return; wrap.innerHTML='';
+  wrap.className='members-grid';
   state.members.forEach(m=>{
     const initial = (m.display_name||'?').charAt(0).toUpperCase();
-    const occ = m.is_expected ? 'in arrivo' : etichettaOcc(m.occupation);
     const st = memberState(m);
-    const row=document.createElement('div'); row.className='mrow';
-    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
-      <div><div class="mn">${m.display_name}</div><div class="ms">${occ}</div></div>
+    // sottotitolo: età/settimana gravidanza per chi è in arrivo, altrimenti occupazione
+    let sub;
+    if(m.is_expected){
+      const gw = gravidanzaLabel(m);
+      sub = gw || 'in arrivo';
+    } else {
+      sub = etichettaOcc(m.occupation);
+    }
+    const cell=document.createElement('div');
+    cell.className='mcell'+(m.is_expected?' locked':'');
+    cell.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
+      <div class="mcell-txt"><div class="mn">${m.display_name}</div><div class="ms">${sub}</div></div>
       <span class="statepill" style="background:color-mix(in srgb,${st.c} 20%,transparent);color:${st.c}">${st.t}</span>`;
-    wrap.appendChild(row);
+    wrap.appendChild(cell);
   });
+}
+
+// etichetta settimana gravidanza per il membro in arrivo (es. "31+3")
+const homeDueDates = {}; // memberId -> due_date (caricata in loadHomeExtras)
+function gravidanzaLabel(m){
+  const due = homeDueDates[m.id];
+  if(!due) return null;
+  // 40 settimane = 280 giorni. settimana attuale = 40 - settimane mancanti al parto
+  const oggi=new Date(); const parto=new Date(due+'T12:00:00');
+  const giorniMancanti=Math.round((parto-oggi)/86400000);
+  const giorniGravidanza=280-giorniMancanti;
+  if(giorniGravidanza<0) return 'in arrivo';
+  const sett=Math.floor(giorniGravidanza/7);
+  const gg=giorniGravidanza%7;
+  return `${sett}+${gg} settimane`;
 }
 
 // blocchi "Prossimi impegni" + "Questo mese"
 async function loadHomeExtras(){
+  // date parto per membri in arrivo (settimana gravidanza)
+  const expected = state.members.filter(m=>m.is_expected);
+  if(expected.length){
+    const { data: hr } = await sb.from('health_records').select('member_id,due_date')
+      .in('member_id', expected.map(m=>m.id));
+    (hr||[]).forEach(r=>{ if(r.due_date) homeDueDates[r.member_id]=r.due_date; });
+    renderHomeMembersOnly();
+  }
   // prossimi eventi (da oggi in avanti, max 3)
   const today = new Date().toISOString().slice(0,10);
   const { data: evs } = await sb.from('events')
@@ -547,10 +579,10 @@ $('btn-logout').addEventListener('click', async ()=>{
 // Via!
 // mostra la versione nell'etichetta (sezione tema)
 document.addEventListener('DOMContentLoaded', ()=>{
-  const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION;
+  const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION; const vf=$('version-foot'); if(vf) vf.textContent='v'+MAGS_CONFIG.APP_VERSION;
 });
 
 applyTheme('aurora','system');  // tema neutro finché non carico il profilo
 boot();
 // imposta subito la versione se il DOM è già pronto
-(()=>{ const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION; })();
+(()=>{ const vt=$('version-tag'); if(vt) vt.textContent = 'MAGS · v'+MAGS_CONFIG.APP_VERSION; const vf=$('version-foot'); if(vf) vf.textContent='v'+MAGS_CONFIG.APP_VERSION; })();

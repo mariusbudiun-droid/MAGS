@@ -126,11 +126,12 @@ function renderBudget(){
     const usato=Math.max(0, limit-bal);
     const pct=limit>0?Math.min(100,Math.round(usato/limit*100)):0;
     const vuota=bal<=0;
+    const sforata=bal<0;
     const item=document.createElement('div'); item.className='budget-item';
     item.innerHTML=`<div class="bh"><span>${c?.icon||'🧧'} ${c?c.name:'?'}</span>
-      <span class="amt">${eur(bal)} <span style="color:var(--ink-soft);font-weight:600">disp.</span></span></div>
+      <span class="amt" style="${sforata?'color:#e23b5a':''}">${eur(bal)} <span style="color:var(--ink-soft);font-weight:600">disp.</span></span></div>
       <div class="bar"><i style="width:${pct}%;background:${vuota?'#e23b5a':col}"></i></div>
-      <div class="bsub">nella busta ${eur(bal)} di ${eur(limit)} · tocca per gestire</div>`;
+      <div class="bsub">${sforata?'⚠️ busta sforata · ':''}nella busta ${eur(bal)} di ${eur(limit)} · tocca per gestire</div>`;
     item.style.cursor='pointer';
     item.onclick=()=>manageBusta(b);
     wrap.appendChild(item);
@@ -321,11 +322,21 @@ $('tx-save').addEventListener('click', async ()=>{
       if(editingTx){ ({error}=await sb.from('transactions').update(payload).eq('id', editingTx)); }
       else { ({error}=await sb.from('transactions').insert(payload)); }
       if(error) throw error;
-      // aggiorna saldo conto
-      const acc=soldi.accounts.find(a=>a.id===payload.account_id);
-      if(acc && !editingTx){
-        const delta = kind==='entrata'? amount : -amount;
-        await sb.from('accounts').update({ balance:(+acc.balance||0)+delta }).eq('id', acc.id);
+      // aggiornamento saldi (solo per nuovi movimenti, non in modifica)
+      if(!editingTx){
+        if(kind==='entrata'){
+          const acc=soldi.accounts.find(a=>a.id===payload.account_id);
+          if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)+amount }).eq('id', acc.id);
+        } else {
+          // uscita: se la categoria ha una busta, scala dalla busta; altrimenti dal conto
+          const bud = soldi.budgets.find(b=>b.category_id===payload.category_id);
+          if(bud){
+            await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
+          } else {
+            const acc=soldi.accounts.find(a=>a.id===payload.account_id);
+            if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
+          }
+        }
       }
     }
     $('tx-modal').classList.add('hidden');

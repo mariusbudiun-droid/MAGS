@@ -207,10 +207,14 @@ function renderSaluteCard(){
 
 function openSaluteEdit(){
   const r = hrCurrent || {};
+  const m = state.members.find(x=>x.id===hrMemberId);
+  const inArrivo = m && m.is_expected;
   const wrap=$('hr-card');
   wrap.innerHTML = `
+    ${inArrivo ? `<label class="field-label">Data presunta del parto</label>
+    <input class="field" id="he-due" type="date" value="${r.due_date||''}">` : `
     <label class="field-label">Data di nascita</label>
-    <input class="field" id="he-birth" type="date" value="${r.birth_date||''}">
+    <input class="field" id="he-birth" type="date" value="${r.birth_date||''}">`}
     <label class="field-label">Gruppo sanguigno</label>
     <select class="field" id="he-blood">
       ${['','0+','0-','A+','A-','B+','B-','AB+','AB-'].map(b=>`<option value="${b}"${r.blood_type===b?' selected':''}>${b||'—'}</option>`).join('')}
@@ -229,9 +233,12 @@ function openSaluteEdit(){
 }
 
 async function saveSalute(){
+  const m = state.members.find(x=>x.id===hrMemberId);
+  const inArrivo = m && m.is_expected;
   const payload = {
     member_id: hrMemberId,
-    birth_date: $('he-birth').value || null,
+    birth_date: inArrivo ? null : ($('he-birth')?.value || null),
+    due_date: inArrivo ? ($('he-due')?.value || null) : null,
     blood_type: $('he-blood').value || null,
     allergies: $('he-allergies').value.trim() || null,
     fiscal_code: $('he-fiscal').value.trim().toUpperCase() || null,
