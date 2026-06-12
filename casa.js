@@ -87,41 +87,74 @@ $('casa-additem').addEventListener('click', addItem);
 $('casa-newitem').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
 
 // ---- menù settimanale ----
-const WEEKDAYS = [[1,'Lunedì'],[2,'Martedì'],[3,'Mercoledì'],[4,'Giovedì'],[5,'Venerdì'],[6,'Sabato'],[7,'Domenica']];
 const MEALS = [['pranzo','Pranzo'],['cena','Cena']];
 
+// quanti giorni mostrare di default (da oggi). Aumenta con "+ Aggiungi giorno".
+let menuDaysCount = 3;
+
+function menuToday(){ return new Date().toISOString().slice(0,10); }
+function menuAddDays(dateStr, n){
+  const d=new Date(dateStr+'T12:00:00'); d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10);
+}
+
 async function loadMenu(){
-  const { data } = await sb.from('menu_entries').select('*').eq('household_id', state.household.id);
+  // carico solo i giorni da oggi in avanti
+  const today = menuToday();
+  const { data } = await sb.from('menu_entries').select('*')
+    .eq('household_id', state.household.id)
+    .gte('entry_date', today).order('entry_date');
   casaState.menu = data||[];
+  // se ci sono giorni pianificati oltre i 3 di default, mostrali tutti
+  if(casaState.menu.length){
+    const last = casaState.menu[casaState.menu.length-1].entry_date;
+    const diff = Math.round((new Date(last+'T12:00:00') - new Date(today+'T12:00:00'))/86400000);
+    menuDaysCount = Math.max(menuDaysCount, diff+1);
+  }
 }
-function menuEntry(weekday, meal){
-  return casaState.menu.find(m=>m.weekday===weekday && m.meal===meal);
+function menuEntry(dateStr, meal){
+  return casaState.menu.find(m=>m.entry_date===dateStr && m.meal===meal);
 }
+function menuDayLabel(dateStr){
+  const today=menuToday();
+  if(dateStr===today) return 'Oggi';
+  if(dateStr===menuAddDays(today,1)) return 'Domani';
+  const d=new Date(dateStr+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'short'});
+  return d.charAt(0).toUpperCase()+d.slice(1);
+}
+
 function renderMenu(){
   const wrap=$('casa-menu-list'); wrap.innerHTML='';
-  WEEKDAYS.forEach(([wd,label])=>{
+  const today=menuToday();
+  for(let i=0;i<menuDaysCount;i++){
+    const dateStr=menuAddDays(today,i);
     const day=document.createElement('div'); day.className='menu-day';
-    let html=`<div class="dh">${label}</div>`;
+    let html=`<div class="dh">${menuDayLabel(dateStr)}</div>`;
     MEALS.forEach(([meal,mlabel])=>{
-      const e=menuEntry(wd,meal);
+      const e=menuEntry(dateStr,meal);
       const dish = e?.dish ? `<div class="md">${e.dish}${e.variant_note?`<div class="note">${e.variant_note}</div>`:''}</div>` : `<div class="md empty">— tocca per aggiungere —</div>`;
-      html+=`<div class="menu-meal" data-wd="${wd}" data-meal="${meal}"><span class="mt">${mlabel}</span>${dish}</div>`;
+      html+=`<div class="menu-meal" data-date="${dateStr}" data-meal="${meal}"><span class="mt">${mlabel}</span>${dish}</div>`;
     });
     day.innerHTML=html;
     day.querySelectorAll('.menu-meal').forEach(mm=>{
-      mm.onclick=()=>openMenuModal(parseInt(mm.dataset.wd), mm.dataset.meal);
+      mm.onclick=()=>openMenuModal(mm.dataset.date, mm.dataset.meal);
     });
     wrap.appendChild(day);
-  });
+  }
+  // pulsante aggiungi giorno
+  const addBtn=document.createElement('button');
+  addBtn.className='btn-ghost'; addBtn.id='menu-add-day'; addBtn.textContent='+ Aggiungi giorno';
+  addBtn.style.marginTop='4px';
+  addBtn.onclick=()=>{ menuDaysCount++; renderMenu(); };
+  wrap.appendChild(addBtn);
 }
 
 let editingMenu = null;
-function openMenuModal(weekday, meal){
-  editingMenu = { weekday, meal };
-  const e=menuEntry(weekday, meal);
-  const dayLabel = WEEKDAYS.find(([w])=>w===weekday)[1];
+function openMenuModal(dateStr, meal){
+  editingMenu = { dateStr, meal };
+  const e=menuEntry(dateStr, meal);
   const mealLabel = MEALS.find(([m])=>m===meal)[1];
-  $('menu-modal-title').textContent = `${dayLabel} · ${mealLabel}`;
+  $('menu-modal-title').textContent = `${menuDayLabel(dateStr)} · ${mealLabel}`;
   $('mn-dish').value = e?.dish || '';
   $('mn-note').value = e?.variant_note || '';
   $('mn-clear').style.display = e ? 'block' : 'none';
@@ -135,9 +168,11 @@ $('menu-modal').addEventListener('click', e=>{ if(e.target.id==='menu-modal') cl
 $('mn-save').addEventListener('click', async ()=>{
   const dish=$('mn-dish').value.trim();
   if(!dish){ showError('mn-error','Inserisci un piatto o usa Svuota.'); return; }
-  const { weekday, meal } = editingMenu;
-  const existing = menuEntry(weekday, meal);
-  const payload = { household_id:state.household.id, weekday, meal, dish, variant_note:$('mn-note').value.trim()||null };
+  const { dateStr, meal } = editingMenu;
+  const existing = menuEntry(dateStr, meal);
+  // weekday lo calcolo per compatibilità con la colonna esistente
+  let wd=new Date(dateStr+'T12:00:00').getDay(); wd=wd===0?7:wd;
+  const payload = { household_id:state.household.id, entry_date:dateStr, weekday:wd, meal, dish, variant_note:$('mn-note').value.trim()||null };
   let error;
   if(existing){ ({error}=await sb.from('menu_entries').update(payload).eq('id', existing.id)); }
   else { ({error}=await sb.from('menu_entries').insert(payload)); }
@@ -145,8 +180,8 @@ $('mn-save').addEventListener('click', async ()=>{
   closeMenuModal(); await loadMenu(); renderMenu();
 });
 $('mn-clear').addEventListener('click', async ()=>{
-  const { weekday, meal } = editingMenu;
-  const existing = menuEntry(weekday, meal);
+  const { dateStr, meal } = editingMenu;
+  const existing = menuEntry(dateStr, meal);
   if(existing){ await sb.from('menu_entries').delete().eq('id', existing.id); }
   closeMenuModal(); await loadMenu(); renderMenu();
 });
