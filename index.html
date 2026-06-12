@@ -117,12 +117,13 @@
           <button class="vseg-opt" data-view="giorno">Giorno</button>
         </div>
 
-        <div class="legend" style="margin:0 2px 12px;">
+        <div class="legend" style="margin:0 2px 8px;">
           <span><i style="background:var(--accent)"></i>Lavoro</span>
           <span><i style="background:#ffaa3c"></i>Scuola</span>
           <span><i style="background:#9d7bff"></i>Appuntamento</span>
           <span><i style="background:#22b8a6"></i>Salute</span>
         </div>
+        <div class="legend legend-people" id="cal-legend-people" style="margin:0 2px 12px;"></div>
 
         <div class="cal-head">
           <button class="cal-nav" id="cal-prev">‹</button>
@@ -179,6 +180,10 @@
           <input class="field" id="casa-newitem" placeholder="Aggiungi un articolo…">
           <button class="add-btn" id="casa-additem">+</button>
         </div>
+        <button class="btn-ghost" id="spesa-pick" style="margin-top:10px;">📷 Importa da foto</button>
+        <input type="file" id="spesa-file" accept="image/*" style="display:none;">
+        <div id="spesa-status"></div>
+        <div id="spesa-preview"></div>
       </div>
 
       <!-- sotto: menù -->

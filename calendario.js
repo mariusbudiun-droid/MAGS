@@ -55,6 +55,22 @@ async function loadMonthEventsCal(){
   state.cal.events = data||[];
 }
 
+// iniziale di un membro
+function memberInitial(memberId){
+  const m = state.members.find(x=>x.id===memberId);
+  return (m?.display_name||'?').charAt(0).toUpperCase();
+}
+// costruisce le pastiglie iniziale+categoria di un giorno
+function dayChips(evs, max){
+  const chips = evs.map(e=>{
+    const ini = e.member_id ? memberInitial(e.member_id) : '·';
+    const col = CAT_COLORS[e.category]||'var(--ink-soft)';
+    return `<span class="daychip" style="background:${col}">${ini}</span>`;
+  });
+  if(chips.length<=max) return chips.join('');
+  return chips.slice(0,max-1).join('') + `<span class="daychip more">+${chips.length-(max-1)}</span>`;
+}
+
 function renderMonth(){
   const sel = new Date(state.cal.selDate+'T12:00:00');
   const y=sel.getFullYear(), mo=sel.getMonth();
@@ -73,9 +89,7 @@ function renderMonth(){
     if(dateStr===todayYmd()) cell.classList.add('today');
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
     const evs=eventsForDay(dateStr);
-    const cats=[...new Set(evs.map(e=>e.category))].slice(0,4);
-    const pips=cats.map(c=>`<span class="mg-pip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
-    cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-pips">${pips}</span>`;
+    cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,4)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
     grid.appendChild(cell);
   }
@@ -104,6 +118,12 @@ function renderCalFilter(){
   };
   mk('all','Tutti');
   state.members.forEach(m=> mk(m.id, m.display_name));
+
+  // legenda persone (iniziale + colore persona)
+  const lp=$('cal-legend-people');
+  if(lp){
+    lp.innerHTML = state.members.map(m=>`<span><b class="lp-ini" style="background:${m.color}">${(m.display_name||'?').charAt(0).toUpperCase()}</b>${m.display_name}</span>`).join('');
+  }
 }
 
 async function loadWeekEvents(){
@@ -375,9 +395,36 @@ const DUTY_LABELS = {
 };
 function dutyDescription(d){
   if(d.type==='flight' && Array.isArray(d.flights) && d.flights.length){
-    return d.flights.map(f=>`${f.from}→${f.to}`).join(' · ');
+    return flightRoute(d);
   }
   return DUTY_LABELS[d.type] || (d.assignment||'Duty');
+}
+// rotta compatta: NRN-AHO-NRN (catena degli aeroporti senza ripetere)
+function flightRoute(d){
+  if(!d.flights?.length) return '';
+  const seq=[];
+  d.flights.forEach(f=>{
+    if(seq.length===0) seq.push(f.from);
+    if(seq[seq.length-1]!==f.from) seq.push(f.from);
+    seq.push(f.to);
+  });
+  return seq.join('-');
+}
+// aggiunge/sottrae minuti a "HH:MM" → "HH:MM"
+function shiftHHMM(hhmm, deltaMin){
+  if(!hhmm) return null;
+  const [h,m]=hhmm.split(':').map(Number);
+  let tot=h*60+m+deltaMin;
+  tot=((tot%1440)+1440)%1440;
+  return `${String(Math.floor(tot/60)).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;
+}
+// check-in (−45) e check-out (+30) dal primo decollo / ultimo atterraggio (in locale)
+function dutyCheckInOut(d){
+  if(d.type!=='flight' || !d.flights?.length) return { ci:null, co:null };
+  const primo=d.flights[0], ultimo=d.flights[d.flights.length-1];
+  const dep = primo?.dep ? utcToLocalHHMM(primo.dep, d.date) : null;
+  const arr = ultimo?.arr ? utcToLocalHHMM(ultimo.arr, d.date) : null;
+  return { ci: dep?shiftHHMM(dep,-45):null, co: arr?shiftHHMM(arr,30):null };
 }
 function dutyTimes(d){
   // ritorna {dep, arr} in locale per voli, o hsbyStart/End per standby
@@ -404,8 +451,12 @@ function renderRosterPreview(){
     const dLabel = new Date(d.date+'T12:00:00').toLocaleDateString('it-IT',{weekday:'short',day:'numeric',month:'short'});
     const desc = dutyDescription(d);
     const t = dutyTimes(d);
+    const cio = dutyCheckInOut(d);
     const orario = t.start ? (t.end ? `${t.start}–${t.end}` : t.start) : '';
-    const extra = d.type==='flight' && d.flights?.length ? `${d.flights.length} tratte${orario?' · '+orario:''}` : orario;
+    let extra;
+    if(d.type==='flight' && d.flights?.length){
+      extra = (cio.ci||cio.co) ? `CI: ${cio.ci||'—'} · CO: ${cio.co||'—'}` : orario;
+    } else { extra = orario; }
     html+=`<div class="rday"><span class="rd">${dLabel}</span>
       <div><div class="rt">${desc}<span class="rbadge">${d.assignment||d.type||''}</span></div>
       ${extra?`<div class="rm">${extra}</div>`:''}</div></div>`;
@@ -427,6 +478,9 @@ async function saveRoster(){
     const desc = dutyDescription(d);
     const t = dutyTimes(d);
     const allDay = !t.start;  // se non c'è orario, evento tutto il giorno (es. ferie)
+    const cio = dutyCheckInOut(d);
+    let note = `Roster · ${DUTY_LABELS[d.type]||d.type||''}${d.assignment?' · '+d.assignment:''}`;
+    if(cio.ci || cio.co){ note += `\nCI: ${cio.ci||'—'}  CO: ${cio.co||'—'}`; }
     return {
       household_id: state.household.id,
       member_id: state.me ? state.me.id : null,
@@ -436,7 +490,7 @@ async function saveRoster(){
       end_at: (!allDay && t.end) ? `${d.date}T${t.end}:00` : null,
       all_day: allDay,
       location: d.type==='flight' ? 'PSR' : null,
-      note: `Roster · ${DUTY_LABELS[d.type]||d.type||''}${d.assignment?' · '+d.assignment:''}`,
+      note,
       source: 'roster',
       created_by: state.me ? state.me.id : null,
     };

@@ -86,6 +86,76 @@ async function addItem(){
 $('casa-additem').addEventListener('click', addItem);
 $('casa-newitem').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
 
+// ---- import lista spesa da screenshot ----
+let spesaItems = null;
+$('spesa-pick').addEventListener('click', ()=>$('spesa-file').click());
+$('spesa-file').addEventListener('change', async (e)=>{
+  const file=e.target.files?.[0]; if(!file) return;
+  if(!casaState.currentList){ setSpesaStatus('err','Seleziona prima una lista.'); return; }
+  setSpesaStatus('load','Leggo la lista dalla foto…');
+  try{
+    const { base64, mediaType } = await fileToB64Spesa(file);
+    const r = await fetch('/api/import-spesa', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ imageBase64:base64, mediaType })
+    });
+    const data = await r.json();
+    if(!r.ok){ setSpesaStatus('err', data.error || 'Errore lettura'); return; }
+    spesaItems = (data.items||[]).map(s=>({ name:s, keep:true }));
+    if(spesaItems.length===0){ setSpesaStatus('err','Nessun articolo trovato.'); return; }
+    clearSpesaStatus(); renderSpesaPreview();
+  }catch(err){ setSpesaStatus('err','Errore: '+(err.message||err)); }
+  finally{ e.target.value=''; }
+});
+
+function renderSpesaPreview(){
+  const wrap=$('spesa-preview');
+  let html=`<div class="sec-row"><h2>Trovati ${spesaItems.length} articoli</h2></div><div class="card" style="padding:6px 16px;">`;
+  spesaItems.forEach((it,i)=>{
+    html+=`<label class="spesa-prev-row">
+      <input type="checkbox" ${it.keep?'checked':''} data-i="${i}">
+      <span>${it.name}</span></label>`;
+  });
+  html+=`</div>
+    <button class="btn-primary" id="spesa-confirm">Aggiungi selezionati</button>
+    <button class="btn-ghost" id="spesa-cancel" style="margin-top:8px;">Annulla</button>`;
+  wrap.innerHTML=html;
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    cb.addEventListener('change',()=>{ spesaItems[parseInt(cb.dataset.i)].keep=cb.checked; });
+  });
+  $('spesa-confirm').addEventListener('click', confirmSpesa);
+  $('spesa-cancel').addEventListener('click', ()=>{ spesaItems=null; wrap.innerHTML=''; });
+}
+
+async function confirmSpesa(){
+  const keep = spesaItems.filter(it=>it.keep);
+  if(keep.length===0 || !casaState.currentList){ spesaItems=null; $('spesa-preview').innerHTML=''; return; }
+  const rows = keep.map(it=>({ list_id:casaState.currentList, name:it.name, added_by:state.me?state.me.id:null, source:'manuale' }));
+  const btn=$('spesa-confirm'); if(btn){ btn.disabled=true; btn.textContent='Aggiungo…'; }
+  const { error } = await sb.from('shopping_items').insert(rows);
+  spesaItems=null; $('spesa-preview').innerHTML='';
+  if(error){ setSpesaStatus('err','Errore: '+error.message); return; }
+  loadItems();
+}
+
+function setSpesaStatus(kind,msg){
+  const el=$('spesa-status'); if(!el) return;
+  const col = kind==='err'?'#e23b5a':kind==='load'?'var(--ink-soft)':'var(--accent)';
+  el.innerHTML=`<div style="text-align:center;padding:10px;color:${col};font-size:13px;">${msg}</div>`;
+}
+function clearSpesaStatus(){ const el=$('spesa-status'); if(el) el.innerHTML=''; }
+
+// converte un File in base64 (riusa lo stesso helper del roster se esiste)
+async function fileToB64Spesa(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{ const res=reader.result; const base64=String(res).split(',')[1]; resolve({ base64, mediaType:file.type||'image/jpeg' }); };
+    reader.onerror=()=>reject(new Error('Lettura file fallita'));
+    reader.readAsDataURL(file);
+  });
+}
+
+
 // ---- menù settimanale ----
 const MEALS = [['pranzo','Pranzo'],['cena','Cena']];
 
