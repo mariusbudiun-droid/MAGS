@@ -124,7 +124,9 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .tab{cursor:pointer;}
 
 /* subnav (sottosezioni dentro una macro) */
-.subnav{display:flex;gap:7px;overflow-x:auto;margin:6px 0 14px;padding-bottom:3px;}
+.subnav{display:flex;flex-wrap:nowrap;gap:7px;overflow-x:auto;margin:6px 0 14px;padding-bottom:3px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.subnav::-webkit-scrollbar{display:none;}
+.subnav .s{flex-shrink:0;white-space:nowrap;}
 .subnav .s{white-space:nowrap;padding:8px 14px;border-radius:var(--pill);background:var(--surface2);font-size:12.5px;font-weight:700;border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;}
 .subnav .s.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
 .sub{display:none;}
@@ -262,6 +264,19 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}
 .hero-card-head .editbtn{margin:0;}
+/* schede salute */
+.hr-hero{padding:15px 16px;}
+.hr-hero-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+.hr-hero-head .av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:16px;flex-shrink:0;}
+.hr-hero-head .grow{flex:1;}
+.hr-hero-head .hr-name{font-weight:700;font-size:16px;}
+.hr-hero-head .hr-eta{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
+.hr-hero-head .edit-ic{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:14px;cursor:pointer;flex-shrink:0;}
+.hr-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.hr-cell{display:flex;flex-direction:column;gap:2px;padding:9px 11px;border-radius:12px;background:color-mix(in srgb,var(--ink) 4%,transparent);}
+.hr-cell .hl{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:700;}
+.hr-cell .hv{font-size:13.5px;font-weight:600;}
+.hr-cell .hv.mono{font-family:var(--mono);font-size:12px;}
 
 .legend{display:flex;gap:13px;flex-wrap:wrap;margin:14px 2px 0;font-size:11px;font-weight:600;color:var(--ink-soft);}
 .legend span{display:flex;align-items:center;gap:5px;}

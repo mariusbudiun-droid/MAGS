@@ -73,9 +73,9 @@ function hexA(hex, a){
   return `rgba(${r},${g},${b},${a})`;
 }
 const DUTY_BG = {
-  early:        'rgba(91,180,255,.32)',   // mattutino - azzurro
-  late:         'rgba(220,60,160,.36)',   // serale - magenta acceso (ben distinto dal verde)
-  standby_early:'rgba(91,180,255,.32)',   // standby mattutino = come early
+  early:        'rgba(56,130,246,.34)',   // mattutino - blu acceso (distinto dal verde)
+  late:         'rgba(220,60,160,.36)',   // serale - magenta
+  standby_early:'rgba(56,130,246,.34)',   // standby mattutino = come early
   standby_late: 'rgba(220,60,160,.36)',   // standby serale = come late
   standby:      'rgba(255,170,60,.22)',   // standby senza orario - ambra
   ferie:        'rgba(34,184,166,.24)',   // verde acqua

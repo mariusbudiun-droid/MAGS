@@ -159,27 +159,10 @@ async function setMyTheme(patch){
 
 
 // ============================================================
-// SALUTE — schede mediche per membro (dati testuali)
+// SALUTE — schede mediche di TUTTI i membri, ognuna in una hero
 // ============================================================
-let hrMemberId = null;
-let hrCurrent = null; // record salute corrente
-
-function openSalute(){
-  const sel=$('hr-member');
-  sel.innerHTML = state.members.map(m=>`<option value="${m.id}">${m.display_name}</option>`).join('');
-  if(!hrMemberId) hrMemberId = state.members[0]?.id;
-  if(hrMemberId) sel.value = hrMemberId;
-  sel.onchange = ()=>{ hrMemberId = sel.value; loadSalute(); };
-  loadSalute();
-}
-
-async function loadSalute(){
-  if(!hrMemberId) return;
-  const { data } = await sb.from('health_records').select('*').eq('member_id', hrMemberId).maybeSingle();
-  hrCurrent = data || null;
-  renderSaluteCard();
-  loadVisite();
-}
+let hrRecords = {};   // member_id -> record
+let hrEditing = null; // member_id in modifica
 
 function calcEta(birth){
   if(!birth) return '';
@@ -190,96 +173,92 @@ function calcEta(birth){
   return e>=0 ? `${e} anni` : '';
 }
 
-function renderSaluteCard(){
-  const m = state.members.find(x=>x.id===hrMemberId);
-  const r = hrCurrent || {};
-  const eta = calcEta(r.birth_date);
-  const wrap=$('hr-card');
-  wrap.innerHTML = `
-    <div class="hr-row"><span class="hl">Data di nascita</span><span class="hv" id="hr-birth-v">${r.birth_date ? new Date(r.birth_date+'T12:00:00').toLocaleDateString('it-IT')+(eta?` · ${eta}`:'') : '—'}</span></div>
-    <div class="hr-row"><span class="hl">Gruppo sanguigno</span><span class="hv">${r.blood_type||'—'}</span></div>
-    <div class="hr-row"><span class="hl">Allergie</span><span class="hv">${r.allergies||'—'}</span></div>
-    <div class="hr-row"><span class="hl">Codice fiscale</span><span class="hv mono">${r.fiscal_code||'—'}</span></div>
-    <div class="hr-row" style="border:none;"><span class="hl">Note</span><span class="hv">${r.notes||'—'}</span></div>
-    <button class="btn-ghost" id="hr-edit" style="margin-top:14px;">✎ Modifica scheda</button>`;
-  $('hr-edit').onclick = openSaluteEdit;
+async function openSalute(){
+  const ids = state.members.map(m=>m.id);
+  const { data } = await sb.from('health_records').select('*').in('member_id', ids);
+  hrRecords = {};
+  (data||[]).forEach(r=>{ hrRecords[r.member_id]=r; });
+  renderSaluteAll();
 }
 
-function openSaluteEdit(){
-  const r = hrCurrent || {};
-  const m = state.members.find(x=>x.id===hrMemberId);
-  const inArrivo = m && m.is_expected;
-  const wrap=$('hr-card');
-  wrap.innerHTML = `
-    ${inArrivo ? `<label class="field-label">Data presunta del parto</label>
-    <input class="field" id="he-due" type="date" value="${r.due_date||''}">` : `
-    <label class="field-label">Data di nascita</label>
-    <input class="field" id="he-birth" type="date" value="${r.birth_date||''}">`}
-    <label class="field-label">Gruppo sanguigno</label>
-    <select class="field" id="he-blood">
-      ${['','0+','0-','A+','A-','B+','B-','AB+','AB-'].map(b=>`<option value="${b}"${r.blood_type===b?' selected':''}>${b||'—'}</option>`).join('')}
-    </select>
-    <label class="field-label">Allergie</label>
-    <input class="field" id="he-allergies" value="${r.allergies||''}" placeholder="Es. Nichel, lattosio">
-    <label class="field-label">Codice fiscale</label>
-    <input class="field" id="he-fiscal" value="${r.fiscal_code||''}" placeholder="RSSMRA..." style="text-transform:uppercase;">
-    <label class="field-label">Note mediche</label>
-    <input class="field" id="he-notes" value="${r.notes||''}" placeholder="Es. gruppo pediatrico Dr. Bianchi">
-    <button class="btn-primary" id="he-save">Salva scheda</button>
-    <button class="btn-ghost" id="he-cancel" style="margin-top:8px;">Annulla</button>
-    <p class="auth-error hidden" id="he-error"></p>`;
-  $('he-cancel').onclick = renderSaluteCard;
-  $('he-save').onclick = saveSalute;
-}
-
-async function saveSalute(){
-  const m = state.members.find(x=>x.id===hrMemberId);
-  const inArrivo = m && m.is_expected;
-  const payload = {
-    member_id: hrMemberId,
-    birth_date: inArrivo ? null : ($('he-birth')?.value || null),
-    due_date: inArrivo ? ($('he-due')?.value || null) : null,
-    blood_type: $('he-blood').value || null,
-    allergies: $('he-allergies').value.trim() || null,
-    fiscal_code: $('he-fiscal').value.trim().toUpperCase() || null,
-    notes: $('he-notes').value.trim() || null,
-  };
-  let error;
-  if(hrCurrent && hrCurrent.id){
-    ({ error } = await sb.from('health_records').update(payload).eq('id', hrCurrent.id));
-  } else {
-    ({ error } = await sb.from('health_records').insert(payload));
-  }
-  if(error){ const e=$('he-error'); if(e){ e.textContent='Errore: '+error.message; e.classList.remove('hidden'); } return; }
-  await loadSalute();
-}
-
-// visite mediche = eventi categoria salute del membro, da oggi in avanti
-async function loadVisite(){
-  const today = new Date().toISOString().slice(0,10);
-  const { data } = await sb.from('events').select('*')
-    .eq('household_id', state.household.id).eq('member_id', hrMemberId).eq('category','salute')
-    .gte('start_at', today+'T00:00:00').order('start_at').limit(10);
-  const wrap=$('hr-visits'); wrap.innerHTML='';
-  if(!data || data.length===0){ wrap.innerHTML='<div class="sol-empty">Nessuna visita in programma.</div>'; return; }
-  data.forEach(e=>{
-    const d=new Date(e.start_at).toLocaleDateString('it-IT',{day:'numeric',month:'short'});
-    const t=e.all_day?'':(e.start_at||'').slice(11,16);
-    const row=document.createElement('div'); row.className='ev';
-    row.innerHTML=`<span class="time">${d}</span><span class="dot" style="background:#22b8a6"></span>
-      <div><div class="ti">${e.title}</div><div class="meta">${[t,e.location].filter(Boolean).join(' · ')}</div></div>`;
-    row.onclick=()=>{ if(typeof openEventModal==='function') openEventModal(e); };
-    wrap.appendChild(row);
+function renderSaluteAll(){
+  const wrap=$('hr-all'); if(!wrap) return; wrap.innerHTML='';
+  state.members.forEach(m=>{
+    const card=document.createElement('section'); card.className='hero-card hr-hero';
+    if(hrEditing===m.id){ card.innerHTML = saluteEditHTML(m); }
+    else { card.innerHTML = saluteViewHTML(m); }
+    wrap.appendChild(card);
+  });
+  // collega i pulsanti
+  state.members.forEach(m=>{
+    const ed=$(`hr-edit-${m.id}`); if(ed) ed.onclick=()=>{ hrEditing=m.id; renderSaluteAll(); };
+    const sv=$(`hr-save-${m.id}`); if(sv) sv.onclick=()=>saveSalute(m);
+    const cn=$(`hr-cancel-${m.id}`); if(cn) cn.onclick=()=>{ hrEditing=null; renderSaluteAll(); };
   });
 }
 
-// aggiungi visita: apre il modal evento precompilato salute + membro
-$('hr-add-visit').addEventListener('click', ()=>{
-  if(typeof openEventModal!=='function') return;
-  openEventModal(null);
-  // precompila categoria salute e membro corrente
-  setTimeout(()=>{
-    const cat=$('ev-category'); if(cat) cat.value='salute';
-    const mem=$('ev-member'); if(mem) mem.value=hrMemberId||'';
-  },0);
-});
+function saluteViewHTML(m){
+  const r=hrRecords[m.id]||{};
+  const initial=(m.display_name||'?').charAt(0).toUpperCase();
+  let etaLine;
+  if(m.is_expected){
+    etaLine = r.due_date ? `Parto previsto ${new Date(r.due_date+'T12:00:00').toLocaleDateString('it-IT')}` : 'Data parto da impostare';
+  } else {
+    const eta=calcEta(r.birth_date);
+    etaLine = r.birth_date ? `${new Date(r.birth_date+'T12:00:00').toLocaleDateString('it-IT')}${eta?' · '+eta:''}` : 'Data di nascita da impostare';
+  }
+  return `
+    <div class="hr-hero-head">
+      <span class="av" style="background:${m.color}">${initial}</span>
+      <div class="grow"><div class="hr-name">${m.display_name}</div><div class="hr-eta">${etaLine}</div></div>
+      <button class="edit-ic" id="hr-edit-${m.id}" title="Modifica">✎</button>
+    </div>
+    <div class="hr-grid">
+      <div class="hr-cell"><span class="hl">Gruppo</span><span class="hv">${r.blood_type||'—'}</span></div>
+      <div class="hr-cell"><span class="hl">Allergie</span><span class="hv">${r.allergies||'—'}</span></div>
+      <div class="hr-cell"><span class="hl">Cod. fiscale</span><span class="hv mono">${r.fiscal_code||'—'}</span></div>
+      <div class="hr-cell"><span class="hl">Note</span><span class="hv">${r.notes||'—'}</span></div>
+    </div>`;
+}
+
+function saluteEditHTML(m){
+  const r=hrRecords[m.id]||{};
+  const inArrivo=m.is_expected;
+  return `
+    <div class="hr-hero-head"><div class="hr-name">✎ ${m.display_name}</div></div>
+    ${inArrivo
+      ? `<label class="field-label">Data presunta del parto</label><input class="field" id="he-due-${m.id}" type="date" value="${r.due_date||''}">`
+      : `<label class="field-label">Data di nascita</label><input class="field" id="he-birth-${m.id}" type="date" value="${r.birth_date||''}">`}
+    <label class="field-label">Gruppo sanguigno</label>
+    <select class="field" id="he-blood-${m.id}">
+      ${['','0+','0-','A+','A-','B+','B-','AB+','AB-'].map(b=>`<option value="${b}"${r.blood_type===b?' selected':''}>${b||'—'}</option>`).join('')}
+    </select>
+    <label class="field-label">Allergie</label>
+    <input class="field" id="he-allergies-${m.id}" value="${r.allergies||''}" placeholder="Es. Nichel, lattosio">
+    <label class="field-label">Codice fiscale</label>
+    <input class="field" id="he-fiscal-${m.id}" value="${r.fiscal_code||''}" placeholder="RSSMRA..." style="text-transform:uppercase;">
+    <label class="field-label">Note mediche</label>
+    <input class="field" id="he-notes-${m.id}" value="${r.notes||''}" placeholder="Es. pediatra Dr. Bianchi">
+    <button class="btn-primary" id="hr-save-${m.id}" style="margin-top:12px;">Salva</button>
+    <button class="btn-ghost" id="hr-cancel-${m.id}" style="margin-top:8px;">Annulla</button>`;
+}
+
+async function saveSalute(m){
+  const r=hrRecords[m.id]||{};
+  const g=(id)=>$(`${id}-${m.id}`);
+  const payload={
+    member_id:m.id,
+    birth_date: m.is_expected ? null : (g('he-birth')?.value || null),
+    due_date:   m.is_expected ? (g('he-due')?.value || null) : null,
+    blood_type: g('he-blood')?.value || null,
+    allergies:  g('he-allergies')?.value.trim() || null,
+    fiscal_code:g('he-fiscal')?.value.trim().toUpperCase() || null,
+    notes:      g('he-notes')?.value.trim() || null,
+  };
+  let error;
+  if(r && r.id){ ({error}=await sb.from('health_records').update(payload).eq('id', r.id)); }
+  else { ({error}=await sb.from('health_records').insert(payload)); }
+  if(error){ alert('Errore: '+error.message); return; }
+  hrEditing=null;
+  await openSalute();
+}
