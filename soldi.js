@@ -261,9 +261,31 @@ function openTxModal(tx){
   $('tx-cat').value = tx ? (tx.category_id||'') : (soldi.categories[0]?.id||'');
   $('tx-account').value = tx ? ('acc:'+(tx.account_id||'')) : ('acc:'+(soldi.accounts.find(a=>a.kind==='comune')?.id||soldi.accounts[0]?.id||''));
   $('tx-date').value = tx ? tx.tx_date : new Date().toISOString().slice(0,10);
+  // se il movimento è su una busta, seleziona la busta nel dropdown
+  if(tx && tx.from_budget) $('tx-account').value='bud:'+tx.from_budget;
+  else if(tx && tx.to_budget && tx.kind==='entrata') $('tx-account').value='bud:'+tx.to_budget;
+  $('tx-delete').style.display = tx ? 'block' : 'none';
   setTxKind(kind);
   clearError('tx-error');
   $('tx-modal').classList.remove('hidden');
+}
+
+// annulla l'effetto di un movimento sui saldi (ridà indietro i soldi)
+async function revertTxEffect(tx){
+  const amt=+tx.amount||0;
+  if(tx.kind==='giroconto'){
+    // sposta: rimetti all'origine, togli dalla destinazione
+    if(tx.from_account){ const a=soldi.accounts.find(x=>x.id===tx.from_account); if(a) await sb.from('accounts').update({balance:(+a.balance||0)+amt}).eq('id',a.id); }
+    if(tx.from_budget){ const b=soldi.budgets.find(x=>x.id===tx.from_budget); if(b) await sb.from('budgets').update({balance:(+b.balance||0)+amt}).eq('id',b.id); }
+    if(tx.to_account){ const a=soldi.accounts.find(x=>x.id===tx.to_account); if(a) await sb.from('accounts').update({balance:(+a.balance||0)-amt}).eq('id',a.id); }
+    if(tx.to_budget){ const b=soldi.budgets.find(x=>x.id===tx.to_budget); if(b) await sb.from('budgets').update({balance:(+b.balance||0)-amt}).eq('id',b.id); }
+  } else if(tx.kind==='entrata'){
+    if(tx.to_budget){ const b=soldi.budgets.find(x=>x.id===tx.to_budget); if(b) await sb.from('budgets').update({balance:(+b.balance||0)-amt}).eq('id',b.id); }
+    else { const a=soldi.accounts.find(x=>x.id===tx.account_id); if(a) await sb.from('accounts').update({balance:(+a.balance||0)-amt}).eq('id',a.id); }
+  } else { // uscita
+    if(tx.from_budget){ const b=soldi.budgets.find(x=>x.id===tx.from_budget); if(b) await sb.from('budgets').update({balance:(+b.balance||0)+amt}).eq('id',b.id); }
+    else { const bud=soldi.budgets.find(b=>b.category_id===tx.category_id); if(bud){ await sb.from('budgets').update({balance:(+bud.balance||0)+amt}).eq('id',bud.id); } else { const a=soldi.accounts.find(x=>x.id===tx.account_id); if(a) await sb.from('accounts').update({balance:(+a.balance||0)+amt}).eq('id',a.id); } }
+  }
 }
 function setTxKind(k){
   document.querySelectorAll('#tx-kind .seg-opt').forEach(b=>b.classList.toggle('on', b.dataset.k===k));
@@ -299,6 +321,30 @@ async function applyMove(fromVal, toVal, amount){
   });
 }
 
+// ricarica i saldi correnti di conti e buste dal DB nello stato locale
+async function reloadBalances(){
+  const hid=state.household.id;
+  const [{data:accs},{data:buds}]=await Promise.all([
+    sb.from('accounts').select('*').eq('household_id',hid),
+    sb.from('budgets').select('*').eq('household_id',hid),
+  ]);
+  if(accs) soldi.accounts=accs;
+  if(buds) soldi.budgets=buds;
+}
+
+// elimina un movimento e ridà indietro i soldi
+$('tx-delete').addEventListener('click', async ()=>{
+  if(!editingTx) return;
+  if(!confirm('Eliminare questo movimento? I soldi torneranno al conto/busta.')) return;
+  const tx=soldi.transactions.find(t=>t.id===editingTx);
+  try{
+    if(tx) await revertTxEffect(tx);
+    await sb.from('transactions').delete().eq('id', editingTx);
+    $('tx-modal').classList.add('hidden');
+    await openSoldi();
+  }catch(err){ showError('tx-error','Errore: '+(err.message||err)); }
+});
+
 $('tx-save').addEventListener('click', async ()=>{
   clearError('tx-error');
   const kind = $('tx-modal').dataset.kind;
@@ -308,7 +354,13 @@ $('tx-save').addEventListener('click', async ()=>{
   const btn=$('tx-save'); btn.disabled=true; btn.textContent='Salvataggio…';
 
   try{
+    // se sto modificando, prima annullo l'effetto del movimento vecchio sui saldi
+    if(editingTx){
+      const oldTx = soldi.transactions.find(t=>t.id===editingTx);
+      if(oldTx) await revertTxEffect(oldTx);
+    }
     if(kind==='sposta'){
+      if(editingTx) await reloadBalances();
       const fromVal=$('tx-from').value, toVal=$('tx-to').value;
       if(fromVal===toVal){ throw new Error('Origine e destinazione coincidono.'); }
       await applyMove(fromVal, toVal, amount);
@@ -329,17 +381,17 @@ $('tx-save').addEventListener('click', async ()=>{
       if(editingTx){ ({error}=await sb.from('transactions').update(payload).eq('id', editingTx)); }
       else { ({error}=await sb.from('transactions').insert(payload)); }
       if(error) throw error;
-      // aggiornamento saldi (solo nuovi movimenti)
-      if(!editingTx){
+      // ricarico i saldi freschi (il revert ha già aggiornato il DB)
+      if(editingTx){ await reloadBalances(); }
+      // applico l'effetto del movimento (nuovo o modificato)
+      {
         if(isBud){
-          // movimento diretto su una busta
           const bud=soldi.budgets.find(b=>b.id===selId);
           if(bud){ const delta=kind==='entrata'?amount:-amount; await sb.from('budgets').update({ balance:(+bud.balance||0)+delta }).eq('id', bud.id); }
         } else if(kind==='entrata'){
           const acc=soldi.accounts.find(a=>a.id===selId);
           if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)+amount }).eq('id', acc.id);
         } else {
-          // uscita: se la categoria ha una busta, scala da lì; altrimenti dal conto
           const bud = soldi.budgets.find(b=>b.category_id===payload.category_id);
           if(bud){ await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id); }
           else { const acc=soldi.accounts.find(a=>a.id===selId); if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id); }
