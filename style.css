@@ -137,6 +137,12 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .filter-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--surface2);font-size:15px;cursor:pointer;display:grid;place-items:center;}
 .filter-btn.on{background:var(--accent);border-color:var(--accent);}
 .filter-pop{margin:0 0 12px;}
+/* leggenda completa in fondo */
+.legend-full{margin-top:22px;padding:16px;border-radius:16px;background:var(--surface2);border:1px solid var(--line);display:flex;flex-direction:column;gap:9px;}
+.legend-full-t{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);font-weight:800;margin-bottom:2px;}
+.legend-full span{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink);}
+.legend-full span i{width:14px;height:6px;border-radius:3px;flex-shrink:0;}
+.legend-full .legend-note{font-size:11px;color:var(--ink-soft);font-style:italic;padding-left:23px;}
 .subnav .s{white-space:nowrap;padding:6px 12px;border-radius:var(--pill);background:var(--surface2);font-size:12px;font-weight:700;border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;}
 .subnav .s.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
 .sub{display:none;}

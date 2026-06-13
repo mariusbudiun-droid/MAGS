@@ -73,13 +73,23 @@ function hexA(hex, a){
   return `rgba(${r},${g},${b},${a})`;
 }
 const DUTY_BG = {
-  early:        'rgba(56,130,246,.34)',   // mattutino - blu acceso (distinto dal verde)
-  late:         'rgba(220,60,160,.36)',   // serale - magenta
-  standby_early:'rgba(56,130,246,.34)',   // standby mattutino = come early
-  standby_late: 'rgba(220,60,160,.36)',   // standby serale = come late
-  standby:      'rgba(255,170,60,.22)',   // standby senza orario - ambra
-  ferie:        'rgba(34,184,166,.24)',   // verde acqua
-  off:          'rgba(120,210,150,.13)',  // verde tenue (riposo)
+  early:        'rgba(56,130,246,.34)',
+  late:         'rgba(220,60,160,.36)',
+  standby_early:'rgba(56,130,246,.34)',
+  standby_late: 'rgba(220,60,160,.36)',
+  standby:      'rgba(255,170,60,.22)',
+  ferie:        'rgba(34,184,166,.24)',
+  off:          'rgba(120,210,150,.13)',
+};
+// colori pieni per la barra superiore del giorno
+const DUTY_BAR = {
+  early:        '#3882f6',
+  late:         '#dc3ca0',
+  standby_early:'#3882f6',
+  standby_late: '#dc3ca0',
+  standby:      '#ffaa3c',
+  ferie:        '#22b8a6',
+  off:          '#78d296',
 };
 // pallini SOLO per eventi non-lavoro (appuntamenti, visite, famiglia)
 function dayChips(evs, max){
@@ -126,15 +136,20 @@ function renderMonth(){
     const cell=document.createElement('div'); cell.className='mg-cell';
     if(dateStr===todayYmd()) cell.classList.add('today');
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
-    // sfondo = il mio lavoro
+    // barra superiore = il mio lavoro (coesiste col bordo scuola in basso)
+    const shadows=[];
+    // barra superiore = il mio lavoro
     const duty=myDutyOn(dateStr);
-    if(duty && DUTY_BG[duty] && !cell.classList.contains('sel')){ cell.style.background=DUTY_BG[duty]; }
-    // bordo scuola colorato col colore del membro (Alice, Samuel...)
+    if(duty && DUTY_BAR[duty] && !cell.classList.contains('sel')){
+      shadows.push(`inset 0 4px 0 ${DUTY_BAR[duty]}`);
+    }
+    // bordo inferiore = scuola, col colore del membro (Alice, Samuel...)
     const schKids=schoolMembersOn(dateStr);
     if(schKids.length){
       const colr = state.members.find(m=>m.id===schKids[0])?.color || '#ffaa3c';
-      cell.style.boxShadow = `inset 0 -2px 0 ${hexA(colr,.3)}`;
+      shadows.push(`inset 0 -3px 0 ${hexA(colr,.45)}`);
     }
+    if(shadows.length) cell.style.boxShadow = shadows.join(', ');
     const evs=eventsForDay(dateStr);
     cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };

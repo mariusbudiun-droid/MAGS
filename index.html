@@ -130,13 +130,6 @@
       <!-- sotto: agenda -->
       <div class="sub on" id="cal-agenda">
         <div class="filter filter-pop hidden" id="cal-filter"></div>
-
-        <div class="legend" style="margin:0 2px 8px;">
-          <span><i style="background:rgba(56,130,246,.7)"></i>Early</span>
-          <span><i style="background:rgba(220,60,160,.7)"></i>Late</span>
-          <span><i style="background:rgba(255,170,60,.6)"></i>Standby</span>
-          <span><i style="background:rgba(120,210,150,.5)"></i>Off</span>
-        </div>
         <div class="legend legend-people hidden" id="cal-legend-people" style="margin:0 2px 12px;"></div>
 
         <div class="cal-head">
@@ -149,6 +142,19 @@
 
         <div class="sec-row"><h2 id="cal-daytitle">Oggi</h2></div>
         <div class="card" id="cal-events" style="padding:6px 16px;"></div>
+
+        <div class="legend-full">
+          <div class="legend-full-t">Legenda turni (barra in alto)</div>
+          <span><i style="background:#3882f6"></i>Early — check-in prima delle 10:00</span>
+          <span><i style="background:#dc3ca0"></i>Late — check-in dopo le 10:00</span>
+          <span><i style="background:#ffaa3c"></i>Standby senza orario</span>
+          <span class="legend-note">Lo standby con orario segue Early/Late</span>
+          <span><i style="background:#22b8a6"></i>Ferie</span>
+          <span><i style="background:#78d296"></i>Riposo (off)</span>
+          <div class="legend-full-t" style="margin-top:12px;">Altro</div>
+          <span><i style="background:#a78bfa;border-radius:50%"></i>Bordo in basso = scuola (colore del bimbo)</span>
+          <span><i style="background:#9d7bff;border-radius:50%"></i>Pallini = appuntamenti, visite, famiglia</span>
+        </div>
       </div>
 
       <!-- sotto: voli (import roster) -->
@@ -564,7 +570,29 @@
 <script src="soldi.js"></script>
 <script>
   if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').then(reg=>{
+        // controlla aggiornamenti subito e ogni volta che l'app torna in primo piano
+        reg.update();
+        document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) reg.update(); });
+        // quando una nuova versione è pronta, ricarica una volta sola
+        reg.addEventListener('updatefound', ()=>{
+          const nw = reg.installing;
+          if(!nw) return;
+          nw.addEventListener('statechange', ()=>{
+            if(nw.state==='installed' && navigator.serviceWorker.controller){
+              // c'è una versione nuova pronta: aggiorna
+              window.location.reload();
+            }
+          });
+        });
+      }).catch(()=>{});
+      // se il controller cambia (nuovo SW attivo), ricarica una volta
+      let reloaded=false;
+      navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+        if(reloaded) return; reloaded=true; window.location.reload();
+      });
+    });
   }
 </script>
 </body>
