@@ -74,12 +74,12 @@ function hexA(hex, a){
 }
 const DUTY_BG = {
   early:        'rgba(91,180,255,.32)',   // mattutino - azzurro
-  late:         'rgba(168,85,247,.34)',   // serale - viola/magenta (distinto dall'off)
-  standby_early:'rgba(91,180,255,.18)',   // standby mattutino - azzurro tenue
-  standby_late: 'rgba(168,85,247,.18)',   // standby serale - viola tenue
+  late:         'rgba(220,60,160,.36)',   // serale - magenta acceso (ben distinto dal verde)
+  standby_early:'rgba(91,180,255,.32)',   // standby mattutino = come early
+  standby_late: 'rgba(220,60,160,.36)',   // standby serale = come late
   standby:      'rgba(255,170,60,.22)',   // standby senza orario - ambra
   ferie:        'rgba(34,184,166,.24)',   // verde acqua
-  off:          'rgba(120,210,150,.14)',  // verde tenue chiaro (riposo)
+  off:          'rgba(120,210,150,.13)',  // verde tenue (riposo)
 };
 // pallini SOLO per eventi non-lavoro (appuntamenti, visite, famiglia)
 function dayChips(evs, max){

@@ -14,5 +14,5 @@ const MAGS_CONFIG = {
   // Colori di default proposti per i membri al primo setup
   MEMBER_COLORS: ['#5b6cff', '#ff5e9c', '#ffaa3c', '#22b8a6', '#9d7bff', '#ff7a4f'],
 
-  APP_VERSION: '0.9.15',
+  APP_VERSION: '0.9.16',
 };
