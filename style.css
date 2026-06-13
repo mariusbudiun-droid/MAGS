@@ -266,9 +266,9 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 /* hero home */
 .hero-home{position:relative;overflow:hidden;border-radius:22px;padding:26px 22px;margin-bottom:18px;
   background:var(--grad);box-shadow:var(--shadow);}
-.hero-home .kick{color:rgba(0,0,0,.62);font-weight:800;}
-.hero-home h1{color:#1a1014;text-shadow:0 1px 2px rgba(255,255,255,.25);}
-.hero-home h1 .nm{color:#fff;}
+.hero-home .kick{color:#fff;font-weight:800;text-shadow:0 1px 3px rgba(0,0,0,.35);}
+.hero-home h1{color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.3);}
+.hero-home h1 .nm{color:#fff;opacity:.9;}
 .hero-home::before{content:'';position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.18);pointer-events:none;}
 .hero-home > *{position:relative;}
 .hero-home .kick{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
