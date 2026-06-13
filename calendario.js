@@ -65,13 +65,21 @@ function memberInitial(memberId){
   const m = state.members.find(x=>x.id===memberId);
   return (m?.display_name||'?').charAt(0).toUpperCase();
 }
-// colori sfondo per il lavoro (duty_type)
+// colore sfondo per il lavoro (duty_type)
+function hexA(hex, a){
+  if(!hex || hex[0]!=='#') return hex;
+  const h=hex.replace('#',''); const f=h.length===3?h.split('').map(c=>c+c).join(''):h;
+  const r=parseInt(f.slice(0,2),16), g=parseInt(f.slice(2,4),16), b=parseInt(f.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
 const DUTY_BG = {
-  early: 'rgba(91,180,255,.30)',     // mattutino - azzurro
-  late:  'rgba(122,92,255,.30)',     // serale - indaco
-  standby:'rgba(255,170,60,.22)',    // ambra
-  ferie: 'rgba(34,184,166,.22)',     // verde acqua
-  off:   'rgba(80,200,120,.16)',     // verde tenue (riposo)
+  early:        'rgba(91,180,255,.32)',   // mattutino - azzurro
+  late:         'rgba(168,85,247,.34)',   // serale - viola/magenta (distinto dall'off)
+  standby_early:'rgba(91,180,255,.18)',   // standby mattutino - azzurro tenue
+  standby_late: 'rgba(168,85,247,.18)',   // standby serale - viola tenue
+  standby:      'rgba(255,170,60,.22)',   // standby senza orario - ambra
+  ferie:        'rgba(34,184,166,.24)',   // verde acqua
+  off:          'rgba(120,210,150,.14)',  // verde tenue chiaro (riposo)
 };
 // pallini SOLO per eventi non-lavoro (appuntamenti, visite, famiglia)
 function dayChips(evs, max){
@@ -93,10 +101,12 @@ function myDutyOn(dateStr){
   const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===state.me.id && (e.start_at||'').slice(0,10)===dateStr);
   return ev ? (ev.duty_type||'duty') : null;
 }
-// qualcuno ha scuola in questo giorno? (per il bordo) - usa gli orari caricati
-function schoolOn(dateStr){
+// chi ha scuola in questo giorno (lista member_id) - per i bordi colorati
+function schoolMembersOn(dateStr){
   const wd=(()=>{ let x=new Date(dateStr+'T12:00:00').getDay(); return x===0?7:x; })();
-  return (calSchedules||[]).some(s=>s.weekday===wd && /scuola/i.test(s.label||''));
+  const ids=new Set();
+  (calSchedules||[]).forEach(s=>{ if(s.weekday===wd && /scuola/i.test(s.label||'')) ids.add(s.member_id); });
+  return [...ids];
 }
 
 function renderMonth(){
@@ -119,8 +129,12 @@ function renderMonth(){
     // sfondo = il mio lavoro
     const duty=myDutyOn(dateStr);
     if(duty && DUTY_BG[duty] && !cell.classList.contains('sel')){ cell.style.background=DUTY_BG[duty]; }
-    // bordo scuola
-    if(schoolOn(dateStr)) cell.classList.add('school');
+    // bordo scuola colorato col colore del membro (Alice, Samuel...)
+    const schKids=schoolMembersOn(dateStr);
+    if(schKids.length){
+      const colr = state.members.find(m=>m.id===schKids[0])?.color || '#ffaa3c';
+      cell.style.boxShadow = `inset 0 -3px 0 ${hexA(colr,.55)}`;
+    }
     const evs=eventsForDay(dateStr);
     cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
@@ -561,7 +575,11 @@ async function saveRoster(){
       // early se il check-in è prima delle 10:00, altrimenti late
       const ciMin = cio.ci ? (parseInt(cio.ci.slice(0,2))*60+parseInt(cio.ci.slice(3,5))) : (t.start?parseInt(t.start.slice(0,2))*60:600);
       duty_type = ciMin < 10*60 ? 'early' : 'late';
-    } else if(['hsby','ad'].includes(d.type)){ duty_type='standby'; }
+    } else if(['hsby','ad'].includes(d.type)){
+      // standby segue early/late dall'orario di inizio, se c'è
+      if(t.start){ const sm=parseInt(t.start.slice(0,2))*60+parseInt(t.start.slice(3,5)); duty_type = sm < 10*60 ? 'standby_early' : 'standby_late'; }
+      else duty_type='standby';
+    }
     else if(d.type==='al'){ duty_type='ferie'; }
     else if(d.type==='off'){ duty_type='off'; }
     else { duty_type=d.type||'duty'; }
