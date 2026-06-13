@@ -374,24 +374,29 @@ function renderHome(){
 }
 
 // dati di oggi per gli statepill: eventi lavoro + orari attivi - vacanze
-const todayState = { flightMembers:new Set(), schoolMembers:new Set(), activityMembers:new Map(), loaded:false };
+const todayState = { flightMembers:new Set(), dutyLabels:new Map(), schoolMembers:new Set(), activityMembers:new Map(), loaded:false };
 async function loadTodayStates(){
   const today = todayYmd();
   const now = new Date();
   const nowMin = now.getHours()*60 + now.getMinutes();
   const weekday = (()=>{ let d=new Date(today+'T12:00:00').getDay(); return d===0?7:d; })();
 
-  // chi è IN VOLO ADESSO (evento lavoro che copre l'ora attuale)
-  const { data: evs } = await sb.from('events').select('member_id,category,start_at,end_at')
+  // chi è in turno ADESSO + che tipo di turno (per la statepill)
+  const { data: evs } = await sb.from('events').select('member_id,category,start_at,end_at,duty_type,title')
     .eq('household_id', state.household.id).eq('category','lavoro')
     .gte('start_at', today+'T00:00:00').lt('start_at', today+'T23:59:59');
-  todayState.flightMembers = new Set((evs||[]).filter(e=>{
-    if(!e.member_id) return false;
+  todayState.flightMembers = new Set();
+  todayState.dutyLabels = new Map();
+  (evs||[]).forEach(e=>{
+    if(!e.member_id) return;
     const s = e.start_at ? toMin(e.start_at.slice(11,16)) : null;
     const en = e.end_at ? toMin(e.end_at.slice(11,16)) : (s!=null ? s+120 : null);
-    if(s==null) return false;
-    return nowMin>=s && nowMin<=en;
-  }).map(e=>e.member_id));
+    if(s==null) return;
+    if(nowMin>=s && nowMin<=en){
+      todayState.flightMembers.add(e.member_id);
+      todayState.dutyLabels.set(e.member_id, dutyShort(e.duty_type, e.title));
+    }
+  });
 
   // orari di oggi (scuola/attività) attivi ADESSO, escludendo chi è in vacanza
   const memberIds = state.members.map(m=>m.id);
@@ -422,17 +427,34 @@ async function loadTodayStates(){
 
 function toMin(hhmm){ if(!hhmm) return 0; const [h,m]=hhmm.split(':').map(Number); return h*60+(m||0); }
 
+// etichetta breve del turno per la statepill
+function dutyShort(duty, title){
+  const t=(title||'').toUpperCase();
+  // riconosci sigle comuni dal titolo del turno
+  if(/HSBY|HOME STANDBY|HSTBY/.test(t)) return 'HSBY';
+  if(/\bAD\b|AIRPORT DUTY|ASBY|ASTBY/.test(t)) return 'AD';
+  if(/SBY|STANDBY/.test(t)) return 'STANDBY';
+  switch(duty){
+    case 'standby': case 'standby_early': case 'standby_late': return 'STANDBY';
+    case 'ferie': return 'FERIE';
+    case 'off': return 'RIPOSO';
+    case 'early': case 'late': default: return 'IN VOLO';
+  }
+}
+
 // statepill: usa i dati reali di ADESSO se disponibili, altrimenti CASA
 function memberState(m){
   if(m.is_expected) return { t:'ATTESA', c:'#22b8a6' };
   if(todayState.loaded){
-    if(todayState.flightMembers.has(m.id)) return { t:'IN VOLO', c:'#5b6cff' };
+    if(todayState.flightMembers.has(m.id)){
+      const lbl = todayState.dutyLabels ? (todayState.dutyLabels.get(m.id)||'IN VOLO') : 'IN VOLO';
+      const col = lbl==='IN VOLO' ? '#5b6cff' : (lbl==='RIPOSO'?'#78d296':(lbl==='FERIE'?'#22b8a6':'#ffaa3c'));
+      return { t:lbl, c:col };
+    }
     if(todayState.schoolMembers.has(m.id)) return { t:'SCUOLA', c:'#ffaa3c' };
     if(todayState.activityMembers.has(m.id)) return { t:todayState.activityMembers.get(m.id), c:'#9d7bff' };
-    // tutto caricato ma nessuna attività in corso → a casa
     return { t:'CASA', c:'#7a85a8' };
   }
-  // fallback prima del caricamento dati
   switch(m.occupation){
     case 'cabin_crew': return { t:'CASA', c:'#5b6cff' };
     case 'lavoro': return { t:'CASA', c:'#9d7bff' };

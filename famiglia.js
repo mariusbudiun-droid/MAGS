@@ -20,7 +20,8 @@ function renderFamUnified(){
     let etaTxt='';
     if(m.is_expected && r.due_date){ etaTxt = gravidanzaLabel ? '' : ''; }
     const eta = m.is_expected ? (r.due_date?dueLabel(r.due_date):'') : (r.birth_date?etaFromBirth(r.birth_date):'');
-    const accesso = m.user_id ? '🟢 Account attivo' : '⚪ Profilo gestito';
+    const link = (typeof memberLinks!=='undefined') ? memberLinks[m.id] : null;
+    const accesso = link ? (link.role==='admin'?'🟢 Account · admin':'🟢 Account attivo') : '⚪ Profilo gestito';
     const card=document.createElement('section'); card.className='hero-card';
     card.innerHTML=`
       <div class="hero-card-head" style="gap:12px;">
@@ -307,8 +308,13 @@ async function openSalute(){
   const { data } = await sb.from('health_records').select('*').in('member_id', ids);
   hrRecords = {};
   (data||[]).forEach(r=>{ hrRecords[r.member_id]=r; });
+  // chi ha un account collegato (da household_members)
+  const { data: links } = await sb.from('household_members').select('member_id, user_id, role').eq('household_id', state.household.id);
+  memberLinks = {};
+  (links||[]).forEach(l=>{ if(l.user_id) memberLinks[l.member_id]={ user_id:l.user_id, role:l.role }; });
   renderFamUnified();
 }
+let memberLinks = {};
 
 function renderSaluteAll(){
   const wrap=$('hr-all'); if(!wrap) return; wrap.innerHTML='';
