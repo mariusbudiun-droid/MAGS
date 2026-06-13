@@ -160,7 +160,14 @@ function renderCalFilter(){
     const p=document.createElement('div');
     p.className='fpill'+(state.cal.filterMember===id?' on':'');
     p.textContent=label;
-    p.onclick=()=>{ state.cal.filterMember=id; renderCalFilter(); if(state.cal.view==='mese') renderMonth(); else if(state.cal.view==='settimana') renderWeek(); renderDayAgenda(); };
+    p.onclick=()=>{
+      state.cal.filterMember=id; renderCalFilter();
+      if(state.cal.view==='mese') renderMonth(); else if(state.cal.view==='settimana') renderWeek();
+      renderDayAgenda();
+      // chiudi la popup dopo la scelta
+      $('cal-filter').classList.add('hidden');
+      const fb=$('cal-filter-btn'); if(fb) fb.classList.toggle('on', id!=='all');
+    };
     wrap.appendChild(p);
   };
   mk('all','Tutti');
@@ -282,6 +289,15 @@ document.querySelectorAll('#cal-viewseg .vseg-opt').forEach(b=>{
     applyCalView();
   });
 });
+
+// toggle filtro persona a comparsa
+(function(){
+  const fb=document.getElementById('cal-filter-btn');
+  if(fb) fb.addEventListener('click', ()=>{
+    const pop=document.getElementById('cal-filter');
+    if(pop) pop.classList.toggle('hidden');
+  });
+})();
 
 // ---- modal evento ----
 let editingEventId = null;

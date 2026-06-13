@@ -110,7 +110,17 @@
   <!-- ===== CALENDARIO ===== -->
   <div class="view" id="v-cal">
     <div class="app-screen">
-      <header class="greet"><div class="kick">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></header>
+      <header class="greet cal-greet">
+        <div><div class="kick">Calendario</div><h1 id="cal-title">Giugno <span class="nm">2026</span></h1></div>
+        <div class="cal-head-tools">
+          <div class="viewseg-mini" id="cal-viewseg">
+            <button class="vseg-opt on" data-view="mese">M</button>
+            <button class="vseg-opt" data-view="settimana">S</button>
+            <button class="vseg-opt" data-view="giorno">G</button>
+          </div>
+          <button class="filter-btn" id="cal-filter-btn" title="Filtra per persona">👤</button>
+        </div>
+      </header>
 
       <div class="subnav" id="cal-subnav">
         <div class="s on" data-s="cal-agenda">Agenda</div>
@@ -120,21 +130,15 @@
 
       <!-- sotto: agenda -->
       <div class="sub on" id="cal-agenda">
-        <div class="filter" id="cal-filter"></div>
-
-        <div class="viewseg" id="cal-viewseg">
-          <button class="vseg-opt" data-view="mese">Mese</button>
-          <button class="vseg-opt on" data-view="settimana">Settimana</button>
-          <button class="vseg-opt" data-view="giorno">Giorno</button>
-        </div>
+        <div class="filter filter-pop hidden" id="cal-filter"></div>
 
         <div class="legend" style="margin:0 2px 8px;">
-          <span><i style="background:rgba(91,180,255,.6)"></i>Early</span>
-          <span><i style="background:rgba(122,92,255,.6)"></i>Late</span>
+          <span><i style="background:rgba(56,130,246,.7)"></i>Early</span>
+          <span><i style="background:rgba(220,60,160,.7)"></i>Late</span>
           <span><i style="background:rgba(255,170,60,.6)"></i>Standby</span>
-          <span><i style="background:#ffaa3c"></i>Scuola</span>
+          <span><i style="background:rgba(120,210,150,.5)"></i>Off</span>
         </div>
-        <div class="legend legend-people" id="cal-legend-people" style="margin:0 2px 12px;"></div>
+        <div class="legend legend-people hidden" id="cal-legend-people" style="margin:0 2px 12px;"></div>
 
         <div class="cal-head">
           <button class="cal-nav" id="cal-prev">‹</button>

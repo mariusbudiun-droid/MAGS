@@ -127,7 +127,17 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .subnav{display:flex;flex-wrap:nowrap;gap:7px;overflow-x:auto;margin:6px 0 14px;padding-bottom:3px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .subnav::-webkit-scrollbar{display:none;}
 .subnav .s{flex-shrink:0;white-space:nowrap;}
-.subnav .s{white-space:nowrap;padding:8px 14px;border-radius:var(--pill);background:var(--surface2);font-size:12.5px;font-weight:700;border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;}
+
+/* header calendario compatto */
+.cal-greet{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;}
+.cal-head-tools{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.viewseg-mini{display:inline-flex;background:var(--surface2);border-radius:var(--pill);padding:2px;gap:1px;}
+.viewseg-mini .vseg-opt{border:none;background:transparent;color:var(--ink-soft);font-weight:800;font-size:12px;width:26px;height:26px;border-radius:var(--pill);cursor:pointer;}
+.viewseg-mini .vseg-opt.on{background:var(--accent);color:#fff;}
+.filter-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:var(--surface2);font-size:15px;cursor:pointer;display:grid;place-items:center;}
+.filter-btn.on{background:var(--accent);border-color:var(--accent);}
+.filter-pop{margin:0 0 12px;}
+.subnav .s{white-space:nowrap;padding:6px 12px;border-radius:var(--pill);background:var(--surface2);font-size:12px;font-weight:700;border:1px solid var(--line);color:var(--ink-soft);cursor:pointer;}
 .subnav .s.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
 .sub{display:none;}
 .sub.on{display:block;animation:fade .25s ease;}
@@ -245,8 +255,11 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 
 /* hero home */
 .hero-home{position:relative;overflow:hidden;border-radius:22px;padding:24px 20px 22px;margin-bottom:18px;
-  background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 30%,var(--surface)) 0%, var(--surface) 70%);
+  background:var(--surface);box-shadow:var(--shadow);
   border:1px solid var(--line);}
+.hero-home::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 22%,transparent) 0%, transparent 65%);}
+.hero-home > *{position:relative;}
 .hero-home .kick{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
 .hero-home h1{font-size:30px;margin:6px 0 0;line-height:1.1;}
 .hero-home .hero-sub{font-size:12.5px;color:var(--ink-soft);margin-top:8px;}
@@ -256,10 +269,13 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-band h2{position:relative;padding-left:12px;}
 .hero-band h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:18px;border-radius:3px;background:var(--accent);}
 
-/* hero-card: sezione contenuto dentro un riquadro morbido */
-.hero-card{position:relative;border-radius:20px;padding:16px;margin-bottom:16px;
-  background:linear-gradient(160deg, color-mix(in srgb,var(--accent) 8%,var(--surface)) 0%, var(--surface) 60%);
-  border:1px solid var(--line);overflow:hidden;}
+/* hero-card: come la card di Soldi (piena), con un velo leggero del tema */
+.hero-card{position:relative;border-radius:var(--radius);padding:16px;margin-bottom:14px;
+  background:var(--surface);
+  border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden;}
+.hero-card::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(160deg, color-mix(in srgb,var(--accent) 9%,transparent) 0%, transparent 55%);}
+.hero-card > *{position:relative;}
 .hero-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}

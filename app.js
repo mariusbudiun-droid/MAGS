@@ -31,7 +31,7 @@ const state = {
     year: new Date().getFullYear(),
     month: new Date().getMonth(),   // 0-11
     weekStart: null,                // lunedì della settimana visibile 'YYYY-MM-DD'
-    view: 'settimana',              // 'mese' | 'settimana' | 'giorno'
+    view: 'mese',                   // 'mese' | 'settimana' | 'giorno'
     selDate: null,                  // 'YYYY-MM-DD'
     filterMember: 'all',            // 'all' o member.id
     events: [],                     // eventi caricati
