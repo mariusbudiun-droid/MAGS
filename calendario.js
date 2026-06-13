@@ -43,16 +43,21 @@ async function applyCalView(){
 }
 
 // carica eventi del mese (per la vista mese)
+let calSchedules = []; // orari ricorrenti (per bordo scuola nel mese)
 async function loadMonthEventsCal(){
   const sel = new Date(state.cal.selDate+'T12:00:00');
   const y=sel.getFullYear(), mo=sel.getMonth();
   const start = `${y}-${pad(mo+1)}-01`;
   const endDate = new Date(y, mo+1, 1);
   const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-01`;
-  const { data } = await sb.from('events').select('*')
-    .eq('household_id', state.household.id)
-    .gte('start_at', start+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at');
+  const memberIds = state.members.map(m=>m.id);
+  const [{ data }, { data: sch }] = await Promise.all([
+    sb.from('events').select('*').eq('household_id', state.household.id)
+      .gte('start_at', start+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at'),
+    sb.from('member_schedules').select('weekday,label,active,member_id').in('member_id', memberIds).eq('active', true),
+  ]);
   state.cal.events = data||[];
+  calSchedules = sch||[];
 }
 
 // iniziale di un membro
@@ -60,10 +65,18 @@ function memberInitial(memberId){
   const m = state.members.find(x=>x.id===memberId);
   return (m?.display_name||'?').charAt(0).toUpperCase();
 }
-// costruisce le pastiglie iniziale+categoria di un giorno
+// colori sfondo per il lavoro (duty_type)
+const DUTY_BG = {
+  early: 'rgba(91,180,255,.30)',     // mattutino - azzurro
+  late:  'rgba(122,92,255,.30)',     // serale - indaco
+  standby:'rgba(255,170,60,.22)',    // ambra
+  ferie: 'rgba(34,184,166,.22)',     // verde acqua
+  off:   'rgba(80,200,120,.16)',     // verde tenue (riposo)
+};
+// pallini SOLO per eventi non-lavoro (appuntamenti, visite, famiglia)
 function dayChips(evs, max){
-  const chips = evs.map(e=>{
-    // eventi "famiglia" senza persona → simbolo dedicato
+  const puntuali = evs.filter(e=>e.category!=='lavoro');
+  const chips = puntuali.map(e=>{
     let ini;
     if(e.category==='famiglia' && !e.member_id) ini='♡';
     else ini = e.member_id ? memberInitial(e.member_id) : '·';
@@ -72,6 +85,18 @@ function dayChips(evs, max){
   });
   if(chips.length<=max) return chips.join('');
   return chips.slice(0,max-1).join('') + `<span class="daychip more">+${chips.length-(max-1)}</span>`;
+}
+
+// il mio turno di lavoro in un giorno (duty_type), per colorare lo sfondo
+function myDutyOn(dateStr){
+  if(!state.me) return null;
+  const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===state.me.id && (e.start_at||'').slice(0,10)===dateStr);
+  return ev ? (ev.duty_type||'duty') : null;
+}
+// qualcuno ha scuola in questo giorno? (per il bordo) - usa gli orari caricati
+function schoolOn(dateStr){
+  const wd=(()=>{ let x=new Date(dateStr+'T12:00:00').getDay(); return x===0?7:x; })();
+  return (calSchedules||[]).some(s=>s.weekday===wd && /scuola/i.test(s.label||''));
 }
 
 function renderMonth(){
@@ -91,6 +116,11 @@ function renderMonth(){
     const cell=document.createElement('div'); cell.className='mg-cell';
     if(dateStr===todayYmd()) cell.classList.add('today');
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
+    // sfondo = il mio lavoro
+    const duty=myDutyOn(dateStr);
+    if(duty && DUTY_BG[duty] && !cell.classList.contains('sel')){ cell.style.background=DUTY_BG[duty]; }
+    // bordo scuola
+    if(schoolOn(dateStr)) cell.classList.add('school');
     const evs=eventsForDay(dateStr);
     cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
@@ -144,8 +174,11 @@ async function loadWeekEvents(){
 
 function eventsForDay(dateStr){
   return state.cal.events.filter(e=>{
-    const d = (e.start_at||'').slice(0,10);
-    if(d!==dateStr) return false;
+    const d0 = (e.start_at||'').slice(0,10);
+    const d1 = (e.end_at||'').slice(0,10);
+    // evento multi-giorno: copre l'intervallo [d0, d1]
+    const inRange = d1 && d1>d0 ? (dateStr>=d0 && dateStr<=d1) : (d0===dateStr);
+    if(!inRange) return false;
     if(state.cal.filterMember!=='all' && e.member_id!==state.cal.filterMember) return false;
     return true;
   }).sort((a,b)=> (a.start_at||'').localeCompare(b.start_at||''));
@@ -256,10 +289,25 @@ function openEventModal(ev){
   $('ev-end').value = ev && ev.end_at ? (ev.end_at||'').slice(11,16) : '';
   $('ev-location').value = ev?.location || '';
   $('ev-note').value = ev?.note || '';
+  // multi-giorno: se l'evento finisce un giorno diverso da quello d'inizio
+  const startDay = (ev?.start_at||'').slice(0,10);
+  const endDay = (ev?.end_at||'').slice(0,10);
+  const isMulti = ev && endDay && endDay!==startDay;
+  $('ev-multi').checked = !!isMulti;
+  $('ev-enddate').value = isMulti ? endDay : '';
+  $('ev-enddate-wrap').style.display = isMulti ? 'block' : 'none';
+  $('ev-times-wrap').style.display = isMulti ? 'none' : 'flex';
   $('ev-delete').style.display = ev ? 'block' : 'none';
   clearError('ev-error');
   $('event-modal').classList.remove('hidden');
 }
+
+// toggle multi-giorno
+$('ev-multi').addEventListener('change', ()=>{
+  const on=$('ev-multi').checked;
+  $('ev-enddate-wrap').style.display = on ? 'block' : 'none';
+  $('ev-times-wrap').style.display = on ? 'none' : 'flex';
+});
 
 function closeEventModal(){ $('event-modal').classList.add('hidden'); }
 $('ev-cancel').addEventListener('click', closeEventModal);
@@ -272,11 +320,22 @@ $('ev-save').addEventListener('click', async ()=>{
   if(!title){ showError('ev-error','Inserisci un titolo.'); return; }
   if(!date){ showError('ev-error','Scegli una data.'); return; }
 
+  const multi = $('ev-multi').checked;
+  const endDate = $('ev-enddate').value;
   const startT = $('ev-start').value;
   const endT = $('ev-end').value;
-  const allDay = !startT;
-  const start_at = allDay ? `${date}T00:00:00` : `${date}T${startT}:00`;
-  const end_at = (!allDay && endT) ? `${date}T${endT}:00` : null;
+
+  let start_at, end_at, allDay;
+  if(multi){
+    if(!endDate || endDate < date){ showError('ev-error','Scegli una data di fine valida.'); return; }
+    allDay = true;
+    start_at = `${date}T00:00:00`;
+    end_at = `${endDate}T23:59:00`;
+  } else {
+    allDay = !startT;
+    start_at = allDay ? `${date}T00:00:00` : `${date}T${startT}:00`;
+    end_at = (!allDay && endT) ? `${date}T${endT}:00` : null;
+  }
 
   const payload = {
     household_id: state.household.id,
@@ -373,7 +432,7 @@ $('roster-file').addEventListener('change', async (e)=>{
     }
     // tieni i giorni con un'attività vera: voli, standby, duty, ferie...
     // scarta solo gli OFF (riposi) che non sono impegni
-    rosterDays = (data.days||[]).filter(d=> d.type && d.type!=='off');
+    rosterDays = (data.days||[]).filter(d=> d.type); // includi anche OFF (per colorare i riposi)
     if(rosterDays.length===0){
       setRosterStatus('err','Nessun impegno trovato nello screenshot.');
       return;
@@ -496,11 +555,22 @@ async function saveRoster(){
     const cio = dutyCheckInOut(d);
     let note = `Roster · ${DUTY_LABELS[d.type]||d.type||''}${d.assignment?' · '+d.assignment:''}`;
     if(cio.ci || cio.co){ note += `\nCI: ${cio.ci||'—'}  CO: ${cio.co||'—'}`; }
+    // duty_type per colorare il calendario
+    let duty_type;
+    if(d.type==='flight'){
+      // early se il check-in è prima delle 10:00, altrimenti late
+      const ciMin = cio.ci ? (parseInt(cio.ci.slice(0,2))*60+parseInt(cio.ci.slice(3,5))) : (t.start?parseInt(t.start.slice(0,2))*60:600);
+      duty_type = ciMin < 10*60 ? 'early' : 'late';
+    } else if(['hsby','ad'].includes(d.type)){ duty_type='standby'; }
+    else if(d.type==='al'){ duty_type='ferie'; }
+    else if(d.type==='off'){ duty_type='off'; }
+    else { duty_type=d.type||'duty'; }
     return {
       household_id: state.household.id,
       member_id: state.me ? state.me.id : null,
-      title: desc,
+      title: d.type==='off' ? 'Riposo' : desc,
       category: 'lavoro',
+      duty_type,
       start_at: allDay ? `${d.date}T00:00:00` : `${d.date}T${t.start}:00`,
       end_at: (!allDay && t.end) ? `${d.date}T${t.end}:00` : null,
       all_day: allDay,

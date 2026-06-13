@@ -82,16 +82,18 @@
   <!-- ===== OGGI ===== -->
   <div class="view on" id="v-oggi">
     <div class="app-screen">
-      <header class="greet">
+      <header class="hero-home">
+        <div class="hero-deco"></div>
         <div class="kick" id="home-date">Oggi</div>
         <h1>Ciao <span class="nm" id="home-name">—</span></h1>
+        <div class="hero-sub" id="hero-sub"></div>
       </header>
       <div class="card" id="home-members"></div>
 
-      <div class="sec-row"><h2>Prossimi impegni</h2><button class="editbtn" id="home-goto-cal">Tutto →</button></div>
+      <div class="sec-row hero-band"><h2>Prossimi impegni</h2><button class="editbtn" id="home-goto-cal">Tutto →</button></div>
       <div class="card" id="home-agenda" style="padding:6px 16px;"></div>
 
-      <div class="sec-row"><h2>Questo mese</h2><button class="editbtn" id="home-goto-soldi">Soldi →</button></div>
+      <div class="sec-row hero-band"><h2>Questo mese</h2><button class="editbtn" id="home-goto-soldi">Soldi →</button></div>
       <div class="card pad" id="home-money" style="padding:16px;"></div>
       <div class="version-foot" id="version-foot">MAGS</div>
     </div>
@@ -119,10 +121,10 @@
         </div>
 
         <div class="legend" style="margin:0 2px 8px;">
-          <span><i style="background:var(--accent)"></i>Lavoro</span>
+          <span><i style="background:rgba(91,180,255,.6)"></i>Early</span>
+          <span><i style="background:rgba(122,92,255,.6)"></i>Late</span>
+          <span><i style="background:rgba(255,170,60,.6)"></i>Standby</span>
           <span><i style="background:#ffaa3c"></i>Scuola</span>
-          <span><i style="background:#9d7bff"></i>Appuntamento</span>
-          <span><i style="background:#22b8a6"></i>Salute</span>
         </div>
         <div class="legend legend-people" id="cal-legend-people" style="margin:0 2px 12px;"></div>
 
@@ -370,7 +372,12 @@
       </select>
       <label class="field-label">Data</label>
       <input class="field" id="ev-date" type="date">
-      <div class="row2">
+      <label class="checkbox-row"><input type="checkbox" id="ev-multi"> Dura più giorni (viaggio)</label>
+      <div id="ev-enddate-wrap" style="display:none;">
+        <label class="field-label">Fino al</label>
+        <input class="field" id="ev-enddate" type="date">
+      </div>
+      <div class="row2" id="ev-times-wrap">
         <div style="flex:1"><label class="field-label">Inizio</label><input class="field" id="ev-start" type="time"></div>
         <div style="flex:1"><label class="field-label">Fine</label><input class="field" id="ev-end" type="time"></div>
       </div>

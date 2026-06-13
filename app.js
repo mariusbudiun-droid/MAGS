@@ -352,6 +352,7 @@ function renderHome(){
   const oggi = new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
   $('home-date').textContent = oggi.charAt(0).toUpperCase()+oggi.slice(1);
   $('home-name').textContent = state.me ? state.me.display_name : 'famiglia';
+  const hs=$('hero-sub'); if(hs){ const full=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); hs.textContent=full.charAt(0).toUpperCase()+full.slice(1); }
 
   renderHomeMembersOnly();
   renderFamiglia();
