@@ -108,12 +108,30 @@ function dayChips(evs, max){
   return chips.slice(0,max-1).join('') + `<span class="daychip more">+${chips.length-(max-1)}</span>`;
 }
 
-// il mio turno di lavoro in un giorno (duty_type), per colorare lo sfondo
-function myDutyOn(dateStr){
-  if(!state.me) return null;
-  const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===state.me.id && (e.start_at||'').slice(0,10)===dateStr);
+// il turno di lavoro di un membro in un dato giorno (duty_type)
+function dutyOfMemberOn(memberId, dateStr){
+  const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===memberId && (e.start_at||'').slice(0,10)===dateStr);
   return ev ? (ev.duty_type||'duty') : null;
 }
+// il mio turno (compatibilità con vista settimana)
+function myDutyOn(dateStr){ return state.me ? dutyOfMemberOn(state.me.id, dateStr) : null; }
+
+// assegna i membri ai 4 lati: adulti(lavoro) sx/dx, bambini(scuola) basso/alto
+// ordine MAGS già applicato a state.members
+function sideAssignments(){
+  const lavoratori = state.members.filter(m=>!m.is_expected && (m.occupation==='cabin_crew'||m.occupation==='lavoro'));
+  const altri = state.members.filter(m=> !lavoratori.includes(m));
+  // se non identifico i lavoratori per occupazione, uso i primi due adulti
+  let adulti = lavoratori.length? lavoratori : state.members.filter(m=>m.member_type==='adulto');
+  const bimbi = state.members.filter(m=> !adulti.includes(m));
+  return {
+    left:  adulti[0]||null,   // Marius
+    right: adulti[1]||null,   // Giada
+    bottom: bimbi[0]||null,   // Alice
+    top:   bimbi[1]||null,    // Samuel
+  };
+}
+
 // chi ha scuola in questo giorno (lista member_id) - rispetta date e vacanze
 function schoolMembersOn(dateStr){
   const wd=(()=>{ let x=new Date(dateStr+'T12:00:00').getDay(); return x===0?7:x; })();
@@ -121,10 +139,8 @@ function schoolMembersOn(dateStr){
   (calSchedules||[]).forEach(s=>{
     if(s.weekday!==wd) return;
     if(!/scuola|infanzia|nido|elem|medie/i.test((s.label||'')+(s.kind||''))) return;
-    // rispetta il periodo dell'attività, se impostato
     if(s.start_date && dateStr < s.start_date) return;
     if(s.end_date && dateStr > s.end_date) return;
-    // sospendi se quel membro è in vacanza/assenza quel giorno
     const inVacanza = (calExceptions||[]).some(x=> x.member_id===s.member_id && x.kind!=='festa' && dateStr>=x.start_date && dateStr<=x.end_date);
     if(inVacanza) return;
     ids.add(s.member_id);
@@ -149,20 +165,20 @@ function renderMonth(){
     const cell=document.createElement('div'); cell.className='mg-cell';
     if(dateStr===todayYmd()) cell.classList.add('today');
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
-    // barra superiore = il mio lavoro (coesiste col bordo scuola in basso)
-    const shadows=[];
-    // barra superiore = il mio lavoro
-    const duty=myDutyOn(dateStr);
-    if(duty && DUTY_BAR[duty] && !cell.classList.contains('sel')){
-      shadows.push(`inset 0 4px 0 ${DUTY_BAR[duty]}`);
+    if(!cell.classList.contains('sel')){
+      const sides=sideAssignments();
+      const schKids=schoolMembersOn(dateStr);
+      const shadows=[];
+      // SINISTRA = lavoro adulto 1 (sempre, se ha un turno quel giorno)
+      if(sides.left){ const dt=dutyOfMemberOn(sides.left.id, dateStr); if(dt&&DUTY_BAR[dt]) shadows.push(`inset 4px 0 0 ${DUTY_BAR[dt]}`); }
+      // DESTRA = lavoro adulto 2
+      if(sides.right){ const dt=dutyOfMemberOn(sides.right.id, dateStr); if(dt&&DUTY_BAR[dt]) shadows.push(`inset -4px 0 0 ${DUTY_BAR[dt]}`); }
+      // BASSO = scuola bambino 1
+      if(sides.bottom && schKids.includes(sides.bottom.id)){ shadows.push(`inset 0 -4px 0 ${hexA(sides.bottom.color,.6)}`); }
+      // ALTO = scuola bambino 2
+      if(sides.top && schKids.includes(sides.top.id)){ shadows.push(`inset 0 4px 0 ${hexA(sides.top.color,.6)}`); }
+      if(shadows.length) cell.style.boxShadow = shadows.join(', ');
     }
-    // bordo inferiore = scuola, col colore del membro (Alice, Samuel...)
-    const schKids=schoolMembersOn(dateStr);
-    if(schKids.length){
-      const colr = state.members.find(m=>m.id===schKids[0])?.color || '#ffaa3c';
-      shadows.push(`inset 0 -3px 0 ${hexA(colr,.45)}`);
-    }
-    if(shadows.length) cell.style.boxShadow = shadows.join(', ');
     const evs=eventsForDay(dateStr);
     cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderMonth(); renderDayAgenda(); };
@@ -251,13 +267,16 @@ function renderWeek(){
     const d = new Date(dateStr+'T12:00:00');
     const cell=document.createElement('div'); cell.className='wday';
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
-    // barre: turno (alto) + scuola (basso)
-    const shadows=[];
-    const duty=myDutyOn(dateStr);
-    if(duty && DUTY_BAR[duty] && dateStr!==state.cal.selDate) shadows.push(`inset 0 4px 0 ${DUTY_BAR[duty]}`);
-    const schKids=schoolMembersOn(dateStr);
-    if(schKids.length){ const colr=state.members.find(m=>m.id===schKids[0])?.color||'#ffaa3c'; shadows.push(`inset 0 -3px 0 ${hexA(colr,.45)}`); }
-    if(shadows.length) cell.style.boxShadow=shadows.join(', ');
+    if(dateStr!==state.cal.selDate){
+      const sides=sideAssignments();
+      const schKids=schoolMembersOn(dateStr);
+      const shadows=[];
+      if(sides.left){ const dt=dutyOfMemberOn(sides.left.id, dateStr); if(dt&&DUTY_BAR[dt]) shadows.push(`inset 4px 0 0 ${DUTY_BAR[dt]}`); }
+      if(sides.right){ const dt=dutyOfMemberOn(sides.right.id, dateStr); if(dt&&DUTY_BAR[dt]) shadows.push(`inset -4px 0 0 ${DUTY_BAR[dt]}`); }
+      if(sides.bottom && schKids.includes(sides.bottom.id)){ shadows.push(`inset 0 -4px 0 ${hexA(sides.bottom.color,.6)}`); }
+      if(sides.top && schKids.includes(sides.top.id)){ shadows.push(`inset 0 4px 0 ${hexA(sides.top.color,.6)}`); }
+      if(shadows.length) cell.style.boxShadow=shadows.join(', ');
+    }
     const evs=eventsForDay(dateStr);
     const cats=[...new Set(evs.filter(e=>e.category!=='lavoro').map(e=>e.category))].slice(0,3);
     const pips=cats.map(c=>`<span class="wpip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
