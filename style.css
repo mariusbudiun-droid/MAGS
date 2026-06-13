@@ -254,11 +254,12 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .checkbox-row input{width:18px;height:18px;accent-color:var(--accent);}
 
 /* hero home */
-.hero-home{position:relative;overflow:hidden;border-radius:22px;padding:24px 20px 22px;margin-bottom:18px;
-  background:var(--surface);box-shadow:var(--shadow);
-  border:1px solid var(--line);}
-.hero-home::before{content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(135deg, color-mix(in srgb,var(--accent) 22%,transparent) 0%, transparent 65%);}
+.hero-home{position:relative;overflow:hidden;border-radius:22px;padding:26px 22px;margin-bottom:18px;
+  background:var(--grad);color:#fff;box-shadow:var(--shadow);}
+.hero-home .kick{color:rgba(255,255,255,.85);}
+.hero-home h1{color:#fff;}
+.hero-home .hero-sub{color:rgba(255,255,255,.8);}
+.hero-home::before{content:'';position:absolute;top:-50px;right:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.13);pointer-events:none;}
 .hero-home > *{position:relative;}
 .hero-home .kick{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
 .hero-home h1{font-size:30px;margin:6px 0 0;line-height:1.1;}
@@ -269,13 +270,11 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-band h2{position:relative;padding-left:12px;}
 .hero-band h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:18px;border-radius:3px;background:var(--accent);}
 
-/* hero-card: come la card di Soldi (piena), con un velo leggero del tema */
+/* hero-card: riquadro sezione ben visibile, fondo pieno + barretta accento */
 .hero-card{position:relative;border-radius:var(--radius);padding:16px;margin-bottom:14px;
   background:var(--surface);
   border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden;}
-.hero-card::before{content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(160deg, color-mix(in srgb,var(--accent) 9%,transparent) 0%, transparent 55%);}
-.hero-card > *{position:relative;}
+.hero-card::after{content:'';position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--grad);}
 .hero-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}
