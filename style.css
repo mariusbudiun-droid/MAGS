@@ -271,9 +271,8 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-home h1 .nm{color:#fff;opacity:.9;}
 .hero-home::before{content:'';position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.18);pointer-events:none;}
 .hero-home > *{position:relative;}
-.hero-home .kick{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;}
+.hero-home .kick{font-size:11px;letter-spacing:.14em;text-transform:uppercase;}
 .hero-home h1{font-size:30px;margin:6px 0 0;line-height:1.1;}
-.hero-home .hero-sub{font-size:12.5px;color:var(--ink-soft);margin-top:8px;}
 .hero-deco{position:absolute;top:-40px;right:-30px;width:150px;height:150px;border-radius:50%;
   background:radial-gradient(circle, color-mix(in srgb,var(--accent) 40%,transparent) 0%, transparent 70%);pointer-events:none;}
 .hero-band{position:relative;}
