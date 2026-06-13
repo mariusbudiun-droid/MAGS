@@ -37,19 +37,14 @@ function renderFamUnified(){
           <div class="hr-cell"><span class="hl">Allergie</span><span class="hv">${r.allergies||'—'}</span></div>
           <div class="hr-cell"><span class="hl">Cod. fiscale</span><span class="hv mono">${r.fiscal_code||'—'}</span></div>
         </div>
-        ${r.notes?`<div style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">📝 ${r.notes}</div>`:''}
-        <div style="display:flex;gap:8px;margin-top:12px;">
-          <button class="btn-ghost" data-health="${m.id}" style="margin:0;flex:1;font-size:13px;padding:10px;">Scheda salute</button>
-        </div>
+        ${r.notes?`<div style="font-size:12.5px;color:rgba(0,0,0,.6);margin-top:10px;">📝 ${r.notes}</div>`:''}
       </div>`;
     wrap.appendChild(card);
   });
-  // collega i pulsanti
+  // il ✎ apre la modifica unica (anagrafica + salute)
   state.members.forEach(m=>{
     const eb=wrap.querySelector(`[data-edit="${m.id}"]`);
-    if(eb) eb.onclick=()=>openMemberEditModal(m);
-    const hb=wrap.querySelector(`[data-health="${m.id}"]`);
-    if(hb) hb.onclick=()=>{ hrEditing=m.id; renderSaluteInline(m); };
+    if(eb) eb.onclick=()=>openMemberFull(m);
   });
 }
 
@@ -69,24 +64,92 @@ function dueLabel(due){
   return `${Math.floor(g/7)}+${g%7} sett.`;
 }
 
-// modal modifica anagrafica (apre un overlay con i campi del membro)
-function openMemberEditModal(m){
-  hrEditing=null;
-  renderFamUnified();
-  // riusa la vecchia logica inline trasformandola: troviamo la card e iniettiamo il form
+// modifica completa: anagrafica + salute in un unico form
+function openMemberFull(m){
   const wrap=$('fam-unified');
   const card=[...wrap.children].find(c=>c.querySelector(`[data-edit="${m.id}"]`));
-  if(card) openMemberEdit(m, card);
+  if(!card) return;
+  const r=(typeof hrRecords!=='undefined' && hrRecords[m.id])||{};
+  const inArrivo=m.is_expected;
+  card.innerHTML=`
+    <div class="hero-card-head"><h2 style="font-size:16px;">✎ ${m.display_name}</h2></div>
+    <div>
+      <label class="field-label">Nome</label>
+      <div style="display:flex;gap:9px;align-items:center;">
+        <input type="color" class="su-dot" id="mf-color" value="${m.color}" style="width:42px;height:42px;border:none;border-radius:12px;padding:0;">
+        <input type="text" class="field" id="mf-name" value="${m.display_name}" style="flex:1;margin:0;">
+      </div>
+      <div class="row2" style="margin-top:10px;">
+        <select class="field" id="mf-type">${TYPE_OPTS.map(([v,l])=>`<option value="${v}"${m.member_type===v?' selected':''}>${l}</option>`).join('')}</select>
+        <select class="field" id="mf-occ">${OCC_OPTS.map(([v,l])=>`<option value="${v}"${m.occupation===v?' selected':''}>${l}</option>`).join('')}</select>
+      </div>
+      ${inArrivo
+        ? `<label class="field-label">Data presunta parto</label><input class="field" id="mf-due" type="date" value="${r.due_date||''}">`
+        : `<label class="field-label">Data di nascita</label><input class="field" id="mf-birth" type="date" value="${r.birth_date||''}">`}
+      <label class="field-label">Gruppo sanguigno</label>
+      <select class="field" id="mf-blood">${['','0+','0-','A+','A-','B+','B-','AB+','AB-'].map(b=>`<option value="${b}"${r.blood_type===b?' selected':''}>${b||'—'}</option>`).join('')}</select>
+      <label class="field-label">Allergie</label>
+      <input class="field" id="mf-allergies" value="${r.allergies||''}" placeholder="Es. Nichel, lattosio">
+      <label class="field-label">Codice fiscale</label>
+      <input class="field" id="mf-fiscal" value="${r.fiscal_code||''}" placeholder="RSSMRA..." style="text-transform:uppercase;">
+      <label class="field-label">Note mediche</label>
+      <input class="field" id="mf-notes" value="${r.notes||''}" placeholder="Es. pediatra Dr. Bianchi">
+      ${inArrivo?`<button class="btn-ghost" id="mf-born" style="margin-top:12px;">🍼 È nato! · attiva profilo</button>`:''}
+      <button class="btn-primary" id="mf-save" style="margin-top:14px;">Salva</button>
+      ${(state.me && m.id===state.me.id)?'':`<button class="btn-ghost" id="mf-delete" style="margin-top:8px;color:#e23b5a;border-color:#e23b5a;">Elimina membro</button>`}
+      <button class="btn-ghost" id="mf-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="mf-error"></p>
+    </div>`;
+  $('mf-cancel').onclick=()=>renderFamUnified();
+  $('mf-save').onclick=()=>saveMemberFull(m);
+  const del=$('mf-delete'); if(del) del.onclick=()=>deleteMember(m);
+  const born=$('mf-born'); if(born) born.onclick=()=>markBorn(m);
 }
 
-// scheda salute inline dentro la vista unificata
-function renderSaluteInline(m){
-  const wrap=$('fam-unified');
-  const card=[...wrap.children].find(c=>c.querySelector(`[data-health="${m.id}"]`));
-  if(!card) return;
-  card.querySelector('div:last-child').innerHTML = saluteEditHTML(m);
-  const sv=$(`hr-save-${m.id}`); if(sv) sv.onclick=()=>saveSalute(m);
-  const cn=$(`hr-cancel-${m.id}`); if(cn) cn.onclick=()=>{ hrEditing=null; renderFamUnified(); };
+async function saveMemberFull(m){
+  const g=id=>$(id);
+  // anagrafica
+  const memberPatch={
+    display_name:g('mf-name').value.trim()||m.display_name,
+    color:g('mf-color').value,
+    member_type:g('mf-type').value,
+    occupation:g('mf-occ').value,
+  };
+  const { error:e1 }=await sb.from('members').update(memberPatch).eq('id',m.id);
+  if(e1){ const e=$('mf-error'); e.textContent='Errore: '+e1.message; e.classList.remove('hidden'); return; }
+  // salute
+  const r=(hrRecords&&hrRecords[m.id])||{};
+  const healthPatch={
+    member_id:m.id,
+    birth_date:m.is_expected?null:(g('mf-birth')?.value||null),
+    due_date:m.is_expected?(g('mf-due')?.value||null):null,
+    blood_type:g('mf-blood').value||null,
+    allergies:g('mf-allergies').value.trim()||null,
+    fiscal_code:g('mf-fiscal').value.trim().toUpperCase()||null,
+    notes:g('mf-notes').value.trim()||null,
+  };
+  if(r&&r.id){ await sb.from('health_records').update(healthPatch).eq('id',r.id); }
+  else { await sb.from('health_records').insert(healthPatch); }
+  // ricarica membri e record
+  await reloadMembers();
+  await openSalute();
+}
+
+async function deleteMember(m){
+  if(!confirm(`Eliminare "${m.display_name}"? Verranno rimossi anche i suoi dati.`)) return;
+  await sb.from('members').delete().eq('id',m.id);
+  await reloadMembers();
+  await openSalute();
+}
+async function markBorn(m){
+  if(!confirm(`Confermi che ${m.display_name} è nato? Il profilo diventerà attivo.`)) return;
+  await sb.from('members').update({ is_expected:false, member_type:'neonato' }).eq('id',m.id);
+  await reloadMembers();
+  await openSalute();
+}
+async function reloadMembers(){
+  const { data }=await sb.from('members').select('*').eq('household_id',state.household.id).order('created_at');
+  if(data) state.members=data;
 }
 
 function renderMembersList(){ renderFamUnified(); }

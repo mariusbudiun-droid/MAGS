@@ -543,6 +543,9 @@ function etichettaOcc(o){
 document.addEventListener('click', (e)=>{
   if(e.target.id==='home-goto-cal'){ document.querySelector('#tabbar .tab[data-v="cal"]').click(); }
   if(e.target.id==='home-goto-soldi'){ document.querySelector('#tabbar .tab[data-v="soldi"]').click(); }
+  if(e.target.id==='home-open-settings'){ $('settings-modal').classList.remove('hidden'); }
+  if(e.target.id==='settings-close'){ $('settings-modal').classList.add('hidden'); }
+  if(e.target.id==='settings-modal'){ $('settings-modal').classList.add('hidden'); }
 });
 
 // ---- navigazione tab principali ----

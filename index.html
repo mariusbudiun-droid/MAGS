@@ -102,28 +102,33 @@
         <div id="home-money"></div>
       </section>
 
-      <section class="hero-card">
-        <div class="hero-card-head"><h2>Il mio tema</h2></div>
-        <div>
-          <label class="field-label">Famiglia tema</label>
-          <div class="theme-grid" id="theme-fam">
-            <button class="theme-opt" data-fam="soft">Soft</button>
-            <button class="theme-opt" data-fam="aurora">Aurora</button>
-            <button class="theme-opt" data-fam="linen">Linen</button>
-            <button class="theme-opt" data-fam="cockpit">Cockpit</button>
-          </div>
-          <label class="field-label">Luminosità</label>
-          <div class="theme-grid three" id="theme-lum">
-            <button class="theme-opt" data-lum="light">☀ Chiaro</button>
-            <button class="theme-opt" data-lum="dark">🌙 Scuro</button>
-            <button class="theme-opt" data-lum="system">⚙ Sistema</button>
-          </div>
-          <label class="field-label">Colore personale</label>
-          <div class="color-row" id="theme-colors"></div>
-          <button class="btn-ghost" id="btn-logout" style="margin-top:22px;">Esci</button>
-        </div>
-      </section>
+      <button class="btn-ghost" id="home-open-settings" style="margin-top:4px;">⚙︎ Impostazioni e tema</button>
       <div class="version-foot" id="version-foot">MAGS</div>
+    </div>
+  </div>
+
+  <!-- Modal impostazioni / tema -->
+  <div class="modal hidden" id="settings-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Impostazioni</h2>
+      <label class="field-label">Famiglia tema</label>
+      <div class="theme-grid" id="theme-fam">
+        <button class="theme-opt" data-fam="soft">Soft</button>
+        <button class="theme-opt" data-fam="aurora">Aurora</button>
+        <button class="theme-opt" data-fam="linen">Linen</button>
+        <button class="theme-opt" data-fam="cockpit">Cockpit</button>
+      </div>
+      <label class="field-label">Luminosità</label>
+      <div class="theme-grid three" id="theme-lum">
+        <button class="theme-opt" data-lum="light">☀ Chiaro</button>
+        <button class="theme-opt" data-lum="dark">🌙 Scuro</button>
+        <button class="theme-opt" data-lum="system">⚙ Sistema</button>
+      </div>
+      <label class="field-label">Colore personale</label>
+      <div class="color-row" id="theme-colors"></div>
+      <button class="btn-ghost" id="btn-logout" style="margin-top:22px;">Esci</button>
+      <button class="btn-ghost" id="settings-close" style="margin-top:8px;">Chiudi</button>
+      <div class="version-tag" id="version-tag">MAGS</div>
     </div>
   </div>
 
@@ -290,7 +295,7 @@
   <!-- ===== FAMIGLIA ===== -->
   <div class="view" id="v-fam">
     <div class="app-screen">
-      <header class="greet"><div class="kick">Famiglia</div><h1>Membri e <span class="nm">temi</span></h1></header>
+      <header class="greet"><div class="kick">Famiglia</div><h1>I <span class="nm">membri</span></h1></header>
 
       <div class="sub on" id="fam-membri">
         <div id="fam-unified"></div>
