@@ -4,26 +4,92 @@
 // SEZIONE FAMIGLIA
 // ============================================================
 function renderFamiglia(){
-  renderMembersList();
-  renderAccessi();
+  openSalute(); // carica i record salute (hrRecords) e poi disegna la vista unificata
 }
 
 const OCC_OPTS = [['nessuna','Nessuna'],['nido','Nido'],['materna','Materna'],['elementari','Elementari'],['medie','Medie'],['lavoro','Lavoro'],['cabin_crew','Cabin crew']];
 const TYPE_OPTS = [['adulto','Adulto'],['bambino','Bambino'],['neonato','Neonato']];
 
-function renderMembersList(){
-  const wrap = $('fam-members-list'); wrap.innerHTML='';
+// vista unica: una hero per membro con anagrafica + accesso + salute
+function renderFamUnified(){
+  const wrap=$('fam-unified'); if(!wrap) return; wrap.innerHTML='';
   state.members.forEach(m=>{
     const initial=(m.display_name||'?').charAt(0).toUpperCase();
-    const sub = m.is_expected ? 'In arrivo' : `${tipoLabel(m.member_type)} · ${etichettaOcc(m.occupation)}`;
-    const row=document.createElement('div'); row.className='medit';
-    row.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
-      <div class="grow"><div class="nm">${m.display_name}</div><div class="ms">${sub}</div></div>
-      <button class="edit-ic" title="Modifica">✎</button>`;
-    row.querySelector('.edit-ic').addEventListener('click', ()=>openMemberEdit(m, row));
-    wrap.appendChild(row);
+    const r=(typeof hrRecords!=='undefined' && hrRecords[m.id])||{};
+    const ruolo = m.is_expected ? 'In arrivo' : etichettaOcc(m.occupation);
+    let etaTxt='';
+    if(m.is_expected && r.due_date){ etaTxt = gravidanzaLabel ? '' : ''; }
+    const eta = m.is_expected ? (r.due_date?dueLabel(r.due_date):'') : (r.birth_date?etaFromBirth(r.birth_date):'');
+    const accesso = m.user_id ? '🟢 Account attivo' : '⚪ Profilo gestito';
+    const card=document.createElement('section'); card.className='hero-card';
+    card.innerHTML=`
+      <div class="hero-card-head" style="gap:12px;">
+        <div style="display:flex;align-items:center;gap:11px;">
+          <span class="av" style="background:${m.color};width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;">${initial}</span>
+          <div><h2 style="font-size:16px;">${m.display_name}</h2><div style="font-size:11px;color:rgba(0,0,0,.5);">${ruolo}${eta?' · '+eta:''}</div></div>
+        </div>
+        <button class="editbtn" data-edit="${m.id}">✎</button>
+      </div>
+      <div>
+        <div class="hr-grid">
+          <div class="hr-cell"><span class="hl">Accesso</span><span class="hv" style="font-size:12px">${accesso}</span></div>
+          <div class="hr-cell"><span class="hl">Gruppo</span><span class="hv">${r.blood_type||'—'}</span></div>
+          <div class="hr-cell"><span class="hl">Allergie</span><span class="hv">${r.allergies||'—'}</span></div>
+          <div class="hr-cell"><span class="hl">Cod. fiscale</span><span class="hv mono">${r.fiscal_code||'—'}</span></div>
+        </div>
+        ${r.notes?`<div style="font-size:12.5px;color:var(--ink-soft);margin-top:10px;">📝 ${r.notes}</div>`:''}
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button class="btn-ghost" data-health="${m.id}" style="margin:0;flex:1;font-size:13px;padding:10px;">Scheda salute</button>
+        </div>
+      </div>`;
+    wrap.appendChild(card);
+  });
+  // collega i pulsanti
+  state.members.forEach(m=>{
+    const eb=wrap.querySelector(`[data-edit="${m.id}"]`);
+    if(eb) eb.onclick=()=>openMemberEditModal(m);
+    const hb=wrap.querySelector(`[data-health="${m.id}"]`);
+    if(hb) hb.onclick=()=>{ hrEditing=m.id; renderSaluteInline(m); };
   });
 }
+
+function etaFromBirth(birth){
+  const b=new Date(birth+'T12:00:00'), n=new Date();
+  let e=n.getFullYear()-b.getFullYear();
+  const mm=n.getMonth()-b.getMonth();
+  if(mm<0||(mm===0&&n.getDate()<b.getDate())) e--;
+  if(e<0) return '';
+  if(e===0){ let mesi=(n.getFullYear()-b.getFullYear())*12+(n.getMonth()-b.getMonth()); if(n.getDate()<b.getDate())mesi--; return `${Math.max(0,mesi)} mesi`; }
+  return `${e} anni`;
+}
+function dueLabel(due){
+  const oggi=new Date(), parto=new Date(due+'T12:00:00');
+  const gg=Math.round((parto-oggi)/86400000);
+  const g=280-gg; if(g<0) return 'in arrivo';
+  return `${Math.floor(g/7)}+${g%7} sett.`;
+}
+
+// modal modifica anagrafica (apre un overlay con i campi del membro)
+function openMemberEditModal(m){
+  hrEditing=null;
+  renderFamUnified();
+  // riusa la vecchia logica inline trasformandola: troviamo la card e iniettiamo il form
+  const wrap=$('fam-unified');
+  const card=[...wrap.children].find(c=>c.querySelector(`[data-edit="${m.id}"]`));
+  if(card) openMemberEdit(m, card);
+}
+
+// scheda salute inline dentro la vista unificata
+function renderSaluteInline(m){
+  const wrap=$('fam-unified');
+  const card=[...wrap.children].find(c=>c.querySelector(`[data-health="${m.id}"]`));
+  if(!card) return;
+  card.querySelector('div:last-child').innerHTML = saluteEditHTML(m);
+  const sv=$(`hr-save-${m.id}`); if(sv) sv.onclick=()=>saveSalute(m);
+  const cn=$(`hr-cancel-${m.id}`); if(cn) cn.onclick=()=>{ hrEditing=null; renderFamUnified(); };
+}
+
+function renderMembersList(){ renderFamUnified(); }
 
 function tipoLabel(t){ return ({adulto:'Adulto',bambino:'Bambino',neonato:'Neonato'})[t]||t; }
 
@@ -106,7 +172,7 @@ $('fam-add-member').addEventListener('click', async ()=>{
 
 // ---- Accessi: chi ha un account collegato ----
 async function renderAccessi(){
-  const wrap=$('fam-accessi-list'); wrap.innerHTML='';
+  const wrap=$('fam-accessi-list'); if(!wrap) return; wrap.innerHTML='';
   const { data: links } = await sb.from('household_members').select('member_id, role, user_id').eq('household_id', state.household.id);
   const linkedIds = new Set((links||[]).map(l=>l.member_id));
   state.members.forEach(m=>{
@@ -178,7 +244,7 @@ async function openSalute(){
   const { data } = await sb.from('health_records').select('*').in('member_id', ids);
   hrRecords = {};
   (data||[]).forEach(r=>{ hrRecords[r.member_id]=r; });
-  renderSaluteAll();
+  renderFamUnified();
 }
 
 function renderSaluteAll(){

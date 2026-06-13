@@ -352,7 +352,6 @@ function renderHome(){
   const oggi = new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'});
   $('home-date').textContent = oggi.charAt(0).toUpperCase()+oggi.slice(1);
   $('home-name').textContent = state.me ? state.me.display_name : 'famiglia';
-  const hs=$('hero-sub'); if(hs){ const full=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'}); hs.textContent=full.charAt(0).toUpperCase()+full.slice(1); }
 
   renderHomeMembersOnly();
   renderFamiglia();
@@ -560,17 +559,8 @@ document.querySelectorAll('#tabbar .tab').forEach(t=>{
     if(t.dataset.v === 'casa') openCasa();
     if(t.dataset.v === 'soldi') openSoldi();
     if(t.dataset.v === 'home') renderHome();
+    if(t.dataset.v === 'fam') renderFamiglia();
     window.scrollTo({top:0,behavior:'smooth'});
-  });
-});
-// ---- navigazione sottosezioni Famiglia ----
-document.querySelectorAll('#fam-subnav .s').forEach(s=>{
-  s.addEventListener('click', ()=>{
-    document.querySelectorAll('#fam-subnav .s').forEach(x=>x.classList.remove('on'));
-    s.classList.add('on');
-    ['fam-membri','fam-salute','fam-accessi','fam-tema'].forEach(id=>$(id).classList.remove('on'));
-    $(s.dataset.s).classList.add('on');
-    if(s.dataset.s==='fam-salute' && typeof openSalute==='function') openSalute();
   });
 });
 
