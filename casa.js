@@ -17,13 +17,8 @@ async function openCasa(){
 
 async function loadLists(){
   let { data } = await sb.from('shopping_lists').select('*').eq('household_id', state.household.id).order('sort_order');
-  if(!data || data.length===0){
-    const toInsert = DEFAULT_LISTS.map((l,i)=>({ household_id:state.household.id, name:l.name, icon:l.icon, sort_order:i }));
-    const { data: created } = await sb.from('shopping_lists').insert(toInsert).select();
-    data = created || [];
-  }
-  casaState.lists = data;
-  if(!casaState.currentList && data.length) casaState.currentList = data[0].id;
+  casaState.lists = data || [];
+  if(!casaState.currentList && casaState.lists.length) casaState.currentList = casaState.lists[0].id;
   renderListPills();
   await loadItems();
 }
@@ -39,9 +34,28 @@ function renderListPills(){
   });
   const add=document.createElement('div'); add.className='listpill add'; add.textContent='+ Lista';
   add.onclick=async ()=>{
-    const name=prompt('Nome della nuova lista:'); if(!name) return;
-    const { data } = await sb.from('shopping_lists').insert({ household_id:state.household.id, name:name.trim(), sort_order:casaState.lists.length }).select().single();
-    if(data){ casaState.currentList=data.id; await loadLists(); }
+    const name=prompt('Nome della nuova lista (es. Spesa, Farmacia):'); if(!name) return;
+    const nome=name.trim();
+    const conBusta=confirm(`Vuoi creare anche una busta "${nome}" collegata a questa lista?\n\nOK = sì, crea busta · Annulla = solo lista`);
+    // crea la lista
+    const { data: lista } = await sb.from('shopping_lists').insert({ household_id:state.household.id, name:nome, sort_order:casaState.lists.length }).select().single();
+    if(!lista) return;
+    if(conBusta){
+      const importo=parseFloat((prompt('Quanto mettere nella busta? (€)','0')||'0').replace(',','.'))||0;
+      // crea categoria omonima + busta, collega la lista
+      let { data: cat } = await sb.from('categories').insert({ household_id:state.household.id, name:nome, icon:'🛒', kind:'spesa' }).select().single();
+      if(cat){
+        const { data: bud } = await sb.from('budgets').insert({ household_id:state.household.id, category_id:cat.id, monthly_limit:importo, balance:importo }).select().single();
+        // collega la lista a categoria + conto comune
+        const corrente=(await sb.from('accounts').select('*').eq('household_id',state.household.id).eq('kind','comune').maybeSingle()).data;
+        await sb.from('shopping_lists').update({ category_id:cat.id, account_id:corrente?.id||null }).eq('id', lista.id);
+        if(importo>0 && corrente){
+          await sb.from('accounts').update({ balance:(+corrente.balance||0)-importo }).eq('id', corrente.id);
+          await sb.from('transactions').insert({ household_id:state.household.id, kind:'giroconto', amount:importo, from_account:corrente.id, to_budget:bud?.id||null, description:`Busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+        }
+      }
+    }
+    casaState.currentList=lista.id; await loadLists();
   };
   wrap.appendChild(add);
 }

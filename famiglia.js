@@ -149,7 +149,7 @@ async function markBorn(m){
 }
 async function reloadMembers(){
   const { data }=await sb.from('members').select('*').eq('household_id',state.household.id).order('created_at');
-  if(data) state.members=data;
+  if(data) state.members=magsSort(data);
 }
 
 function renderMembersList(){ renderFamUnified(); }
@@ -187,7 +187,7 @@ function openMemberEdit(m, rowEl){
     const { error } = await sb.from('members').delete().eq('id', m.id);
     if(error){ const e=$('me-error'); if(e){e.textContent='Errore: '+error.message; e.classList.remove('hidden');} return; }
     const { data: ms } = await sb.from('members').select('*').eq('household_id', state.household.id).order('created_at');
-    state.members = ms||[];
+    state.members = magsSort(ms||[]);
     renderMembersList();
     renderHomeMembersOnly();
   });
@@ -213,7 +213,7 @@ async function updateMember(id, patch){
   if(error){ const e=$('me-error'); if(e){e.textContent='Errore: '+error.message; e.classList.remove('hidden');} return; }
   // ricarico i membri
   const { data: ms } = await sb.from('members').select('*').eq('household_id', state.household.id).order('created_at');
-  state.members = ms||[];
+  state.members = magsSort(ms||[]);
   state.me = state.members.find(x=>x.id===state.me?.id) || state.me;
   applyMyTheme();
   renderMembersList();
@@ -229,7 +229,7 @@ $('fam-add-member').addEventListener('click', async ()=>{
   }).select().single();
   if(error){ alert('Errore: '+error.message); return; }
   const { data: ms } = await sb.from('members').select('*').eq('household_id', state.household.id).order('created_at');
-  state.members = ms||[];
+  state.members = magsSort(ms||[]);
   renderMembersList();
 });
 

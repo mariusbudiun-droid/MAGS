@@ -183,8 +183,8 @@ function renderBollette(){
     const m=d.toLocaleDateString('it-IT',{month:'short'}); const day=d.getDate();
     const row=document.createElement('div'); row.className='bill';
     row.innerHTML=`<div class="bd"><div class="m">${m}</div><div class="d">${day}</div></div>
-      <div><div class="bn">${b.name}</div><div class="bm">${b.frequency}${b.auto_debit?' · domiciliato':''}</div></div>
-      <div class="ba">${eur(b.amount)}</div>`;
+      <div><div class="bn">${b.name}</div><div class="bm">in scadenza${b.auto_debit?' · domiciliato':''}</div></div>
+      <div class="ba">${b.amount?eur(b.amount):'—'}</div>`;
     row.onclick=()=>openBillModal(b);
     wrap.appendChild(row);
   });
@@ -251,13 +251,15 @@ function openTxModal(tx){
   $('tx-modal-title').textContent = tx ? 'Modifica movimento' : 'Nuovo movimento';
   let kind = tx ? (tx.kind==='giroconto'?'sposta':tx.kind) : 'uscita';
   $('tx-cat').innerHTML = soldi.categories.map(c=>`<option value="${c.id}">${c.icon||''} ${c.name}</option>`).join('');
-  $('tx-account').innerHTML = soldi.accounts.map(a=>`<option value="${a.id}">${a.icon||''} ${a.name}</option>`).join('');
+  const accOpts = soldi.accounts.map(a=>`<option value="acc:${a.id}">${a.icon||'🏦'} ${a.name}</option>`).join('');
+  const budOpts = soldi.budgets.map(b=>{ const c=catById(b.category_id); return `<option value="bud:${b.id}">🧧 Busta ${c?c.name:'?'}</option>`; }).join('');
+  $('tx-account').innerHTML = accOpts + budOpts;
   $('tx-from').innerHTML = moveOptions();
   $('tx-to').innerHTML = moveOptions();
   $('tx-amount').value = tx ? tx.amount : '';
   $('tx-desc').value = tx ? (tx.description||'') : '';
   $('tx-cat').value = tx ? (tx.category_id||'') : (soldi.categories[0]?.id||'');
-  $('tx-account').value = tx ? (tx.account_id||'') : (soldi.accounts.find(a=>a.kind==='comune')?.id||soldi.accounts[0]?.id||'');
+  $('tx-account').value = tx ? ('acc:'+(tx.account_id||'')) : ('acc:'+(soldi.accounts.find(a=>a.kind==='comune')?.id||soldi.accounts[0]?.id||''));
   $('tx-date').value = tx ? tx.tx_date : new Date().toISOString().slice(0,10);
   setTxKind(kind);
   clearError('tx-error');
@@ -311,31 +313,36 @@ $('tx-save').addEventListener('click', async ()=>{
       if(fromVal===toVal){ throw new Error('Origine e destinazione coincidono.'); }
       await applyMove(fromVal, toVal, amount);
     } else {
-      // entrata/uscita
+      // entrata/uscita — la fonte può essere un conto (acc:) o una busta (bud:)
+      const sel = $('tx-account').value||'';
+      const isBud = sel.startsWith('bud:');
+      const selId = sel.split(':')[1]||null;
       const payload={
-        household_id:hid, account_id:$('tx-account').value||null,
+        household_id:hid, account_id: isBud ? null : selId,
         category_id: kind==='uscita' ? ($('tx-cat').value||null) : null,
         member_id: state.me?state.me.id:null, kind, amount,
         description:$('tx-desc').value.trim()||null, tx_date:$('tx-date').value,
       };
+      // se è una busta, salvo il riferimento nel campo budget appropriato
+      if(isBud){ if(kind==='uscita') payload.from_budget=selId; else payload.to_budget=selId; }
       let error;
       if(editingTx){ ({error}=await sb.from('transactions').update(payload).eq('id', editingTx)); }
       else { ({error}=await sb.from('transactions').insert(payload)); }
       if(error) throw error;
-      // aggiornamento saldi (solo per nuovi movimenti, non in modifica)
+      // aggiornamento saldi (solo nuovi movimenti)
       if(!editingTx){
-        if(kind==='entrata'){
-          const acc=soldi.accounts.find(a=>a.id===payload.account_id);
+        if(isBud){
+          // movimento diretto su una busta
+          const bud=soldi.budgets.find(b=>b.id===selId);
+          if(bud){ const delta=kind==='entrata'?amount:-amount; await sb.from('budgets').update({ balance:(+bud.balance||0)+delta }).eq('id', bud.id); }
+        } else if(kind==='entrata'){
+          const acc=soldi.accounts.find(a=>a.id===selId);
           if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)+amount }).eq('id', acc.id);
         } else {
-          // uscita: se la categoria ha una busta, scala dalla busta; altrimenti dal conto
+          // uscita: se la categoria ha una busta, scala da lì; altrimenti dal conto
           const bud = soldi.budgets.find(b=>b.category_id===payload.category_id);
-          if(bud){
-            await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
-          } else {
-            const acc=soldi.accounts.find(a=>a.id===payload.account_id);
-            if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
-          }
+          if(bud){ await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id); }
+          else { const acc=soldi.accounts.find(a=>a.id===selId); if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id); }
         }
       }
     }
@@ -354,8 +361,8 @@ $('sol-add-tx').addEventListener('click', ()=>openTxModal(null));
 let editingBill=null;
 function openBillModal(b){
   editingBill=b?b.id:null;
-  $('bill-name').value=b?b.name:''; $('bill-amount').value=b?b.amount:'';
-  $('bill-freq').value=b?b.frequency:'mensile'; $('bill-due').value=b?b.next_due:new Date().toISOString().slice(0,10);
+  $('bill-name').value=b?b.name:''; $('bill-amount').value=b&&b.amount?b.amount:'';
+  $('bill-due').value=b?b.next_due:new Date().toISOString().slice(0,10);
   $('bill-delete').style.display=b?'block':'none';
   clearError('bill-error'); $('bill-modal').classList.remove('hidden');
 }
@@ -364,9 +371,9 @@ $('bill-modal').addEventListener('click', e=>{ if(e.target.id==='bill-modal') $(
 $('sol-add-bill').addEventListener('click', ()=>openBillModal(null));
 $('bill-save').addEventListener('click', async ()=>{
   const name=$('bill-name').value.trim();
-  const amount=parseFloat(($('bill-amount').value||'').replace(',','.'));
-  if(!name||!(amount>0)){ showError('bill-error','Nome e importo richiesti.'); return; }
-  const payload={ household_id:state.household.id, name, amount, frequency:$('bill-freq').value, next_due:$('bill-due').value, active:true };
+  const amount=parseFloat(($('bill-amount').value||'').replace(',','.'))||null;
+  if(!name){ showError('bill-error','Il nome è richiesto.'); return; }
+  const payload={ household_id:state.household.id, name, amount, frequency:'mensile', next_due:$('bill-due').value, active:true };
   let error;
   if(editingBill){ ({error}=await sb.from('recurring_bills').update(payload).eq('id', editingBill)); }
   else { ({error}=await sb.from('recurring_bills').insert(payload)); }

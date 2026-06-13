@@ -487,16 +487,11 @@
   <!-- Modal bolletta -->
   <div class="modal hidden" id="bill-modal">
     <div class="modal-card">
-      <h2 class="modal-title">Scadenza ricorrente</h2>
+      <h2 class="modal-title">Scadenza</h2>
       <label class="field-label">Nome</label>
-      <input class="field" id="bill-name" placeholder="Es. Affitto">
-      <label class="field-label">Importo €</label>
-      <input class="field" id="bill-amount" type="number" inputmode="decimal" placeholder="0,00">
-      <label class="field-label">Frequenza</label>
-      <select class="field" id="bill-freq">
-        <option value="mensile">Mensile</option><option value="bimestrale">Bimestrale</option>
-        <option value="trimestrale">Trimestrale</option><option value="annuale">Annuale</option>
-      </select>
+      <input class="field" id="bill-name" placeholder="Es. Luce, Affitto, Gas">
+      <label class="field-label">Importo € (se lo sai, altrimenti lascia vuoto)</label>
+      <input class="field" id="bill-amount" type="number" inputmode="decimal" placeholder="variabile">
       <label class="field-label">Prossima scadenza</label>
       <input class="field" id="bill-due" type="date">
       <button class="btn-primary" id="bill-save">Salva</button>

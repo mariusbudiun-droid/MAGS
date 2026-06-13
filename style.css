@@ -100,8 +100,12 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .mcell .mn{font-weight:700;font-size:15px;}
 .mcell .ms{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
 .mcell .statepill{position:absolute;top:12px;right:12px;font-size:9px;font-weight:800;padding:3px 8px;border-radius:var(--pill);}
-.mcell.locked{opacity:.5;filter:saturate(.5)blur(.3px);}
-.mcell.locked::after{content:'🔒';position:absolute;bottom:10px;right:12px;font-size:11px;}
+.mcell.locked{opacity:.92;}
+.mcell.locked .av{filter:saturate(.4)blur(1px);opacity:.6;}
+.mcell.locked .mn{opacity:.6;}
+.mcell.locked .ms{opacity:1;color:var(--accent);font-weight:700;}
+.mcell.locked .statepill{opacity:.5;}
+.mcell.locked::after{content:'🔒';position:absolute;bottom:10px;right:12px;font-size:11px;opacity:.5;}
 .mrow:last-child{border-bottom:none;}
 .av{width:46px;height:46px;border-radius:var(--av-r);display:grid;place-items:center;color:#fff;font-weight:800;font-size:17px;flex:none;font-family:var(--display);}
 .mrow .mn{font-weight:700;font-size:16px;}
@@ -262,7 +266,7 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 /* hero home */
 .hero-home{position:relative;overflow:hidden;border-radius:22px;padding:26px 22px;margin-bottom:18px;
   background:var(--grad);box-shadow:var(--shadow);}
-.hero-home .kick{color:rgba(0,0,0,.45);font-weight:700;}
+.hero-home .kick{color:rgba(0,0,0,.62);font-weight:800;}
 .hero-home h1{color:#1a1014;text-shadow:0 1px 2px rgba(255,255,255,.25);}
 .hero-home h1 .nm{color:#fff;}
 .hero-home::before{content:'';position:absolute;top:-50px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.18);pointer-events:none;}
@@ -289,6 +293,11 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-card .ev .ti{color:#1a1014;}
 .hero-card .ev .meta,.hero-card .ev .time{color:rgba(0,0,0,.6);}
 .hero-card .ev{border-color:rgba(255,255,255,.35);}
+/* etichette/valori schede su fondo arancione: testo scuro */
+.hero-card .hr-cell{background:rgba(255,255,255,.45);}
+.hero-card .hr-cell .hl{color:rgba(0,0,0,.55);}
+.hero-card .hr-cell .hv{color:#1a1014;}
+.hero-card .hero-card-head > div div[style*="color"]{color:rgba(0,0,0,.6)!important;}
 .hero-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}

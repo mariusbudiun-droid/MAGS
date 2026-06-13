@@ -41,6 +41,19 @@ const state = {
 const CAT_COLORS = { lavoro:'var(--accent)', scuola:'#ffaa3c', appuntamento:'#9d7bff', salute:'#22b8a6', famiglia:'#7a85a8' };
 const CAT_LABELS = { lavoro:'Lavoro', scuola:'Scuola', appuntamento:'Appuntamento', salute:'Salute', famiglia:'Famiglia' };
 
+// ordina i membri secondo le lettere di MAGS (Marius, Alice, Giada, Samuel),
+// gli altri in coda in ordine alfabetico
+const MAGS_ORDER = ['m','a','g','s'];
+function magsSort(arr){
+  return [...(arr||[])].sort((x,y)=>{
+    const ix=MAGS_ORDER.indexOf((x.display_name||'?').charAt(0).toLowerCase());
+    const iy=MAGS_ORDER.indexOf((y.display_name||'?').charAt(0).toLowerCase());
+    const ax=ix<0?99:ix, ay=iy<0?99:iy;
+    if(ax!==ay) return ax-ay;
+    return (x.display_name||'').localeCompare(y.display_name||'');
+  });
+}
+
 // Helper DOM
 const $ = (id) => document.getElementById(id);
 const show = (id) => $(id).classList.remove('hidden');
@@ -160,7 +173,7 @@ async function loadHousehold(householdId, myMemberId){
   const { data: hh } = await sb.from('households').select('*').eq('id', householdId).single();
   const { data: ms } = await sb.from('members').select('*').eq('household_id', householdId).order('created_at');
   state.household = hh;
-  state.members = ms || [];
+  state.members = magsSort(ms || []);
   state.me = state.members.find(m => m.id === myMemberId) || null;
 }
 
