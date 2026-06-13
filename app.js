@@ -434,13 +434,15 @@ function renderHomeMembersOnly(){
   state.members.forEach(m=>{
     const initial = (m.display_name||'?').charAt(0).toUpperCase();
     const st = memberState(m);
-    // sottotitolo: età/settimana gravidanza per chi è in arrivo, altrimenti occupazione
+    // sottotitolo: occupazione + età; per chi è in arrivo, countdown/settimana parto
     let sub;
     if(m.is_expected){
       const gw = gravidanzaLabel(m);
       sub = gw || 'in arrivo';
     } else {
-      sub = etichettaOcc(m.occupation);
+      const occ = etichettaOcc(m.occupation);
+      const eta = homeBirth[m.id] ? etaLabel(homeBirth[m.id]) : '';
+      sub = [occ, eta].filter(Boolean).join(' · ');
     }
     const cell=document.createElement('div');
     cell.className='mcell'+(m.is_expected?' locked':'');
@@ -453,29 +455,43 @@ function renderHomeMembersOnly(){
 
 // etichetta settimana gravidanza per il membro in arrivo (es. "31+3")
 const homeDueDates = {}; // memberId -> due_date (caricata in loadHomeExtras)
+const homeBirth = {};    // memberId -> birth_date
+function etaLabel(birth){
+  const b=new Date(birth+'T12:00:00'), n=new Date();
+  let e=n.getFullYear()-b.getFullYear();
+  const mm=n.getMonth()-b.getMonth();
+  if(mm<0 || (mm===0 && n.getDate()<b.getDate())) e--;
+  if(e<0) return '';
+  if(e===0){ // meno di un anno: mostra i mesi
+    let mesi=(n.getFullYear()-b.getFullYear())*12 + (n.getMonth()-b.getMonth());
+    if(n.getDate()<b.getDate()) mesi--;
+    return `${Math.max(0,mesi)} mesi`;
+  }
+  return `${e} anni`;
+}
 function gravidanzaLabel(m){
   const due = homeDueDates[m.id];
   if(!due) return null;
-  // 40 settimane = 280 giorni. settimana attuale = 40 - settimane mancanti al parto
   const oggi=new Date(); const parto=new Date(due+'T12:00:00');
   const giorniMancanti=Math.round((parto-oggi)/86400000);
   const giorniGravidanza=280-giorniMancanti;
   if(giorniGravidanza<0) return 'in arrivo';
   const sett=Math.floor(giorniGravidanza/7);
   const gg=giorniGravidanza%7;
-  return `${sett}+${gg} settimane`;
+  const mancano = giorniMancanti>0 ? ` · -${giorniMancanti}gg` : '';
+  return `${sett}+${gg} sett.${mancano}`;
 }
 
 // blocchi "Prossimi impegni" + "Questo mese"
 async function loadHomeExtras(){
-  // date parto per membri in arrivo (settimana gravidanza)
-  const expected = state.members.filter(m=>m.is_expected);
-  if(expected.length){
-    const { data: hr } = await sb.from('health_records').select('member_id,due_date')
-      .in('member_id', expected.map(m=>m.id));
-    (hr||[]).forEach(r=>{ if(r.due_date) homeDueDates[r.member_id]=r.due_date; });
-    renderHomeMembersOnly();
-  }
+  // date nascita + parto per i sottotitoli membri
+  const { data: hr } = await sb.from('health_records').select('member_id,due_date,birth_date')
+    .in('member_id', state.members.map(m=>m.id));
+  (hr||[]).forEach(r=>{
+    if(r.due_date) homeDueDates[r.member_id]=r.due_date;
+    if(r.birth_date) homeBirth[r.member_id]=r.birth_date;
+  });
+  renderHomeMembersOnly();
   // prossimi eventi (da oggi in avanti, max 3)
   const today = new Date().toISOString().slice(0,10);
   const { data: evs } = await sb.from('events')

@@ -44,6 +44,7 @@ async function applyCalView(){
 
 // carica eventi del mese (per la vista mese)
 let calSchedules = []; // orari ricorrenti (per bordo scuola nel mese)
+let calExceptions = []; // vacanze/feste/assenze (sospendono la scuola)
 async function loadMonthEventsCal(){
   const sel = new Date(state.cal.selDate+'T12:00:00');
   const y=sel.getFullYear(), mo=sel.getMonth();
@@ -51,13 +52,15 @@ async function loadMonthEventsCal(){
   const endDate = new Date(y, mo+1, 1);
   const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-01`;
   const memberIds = state.members.map(m=>m.id);
-  const [{ data }, { data: sch }] = await Promise.all([
+  const [{ data }, { data: sch }, { data: exc }] = await Promise.all([
     sb.from('events').select('*').eq('household_id', state.household.id)
       .gte('start_at', start+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at'),
-    sb.from('member_schedules').select('weekday,label,active,member_id').in('member_id', memberIds).eq('active', true),
+    sb.from('member_schedules').select('weekday,label,active,member_id,kind,start_date,end_date').in('member_id', memberIds).eq('active', true),
+    sb.from('schedule_exceptions').select('*').in('member_id', memberIds),
   ]);
   state.cal.events = data||[];
   calSchedules = sch||[];
+  calExceptions = exc||[];
 }
 
 // iniziale di un membro
@@ -111,11 +114,21 @@ function myDutyOn(dateStr){
   const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===state.me.id && (e.start_at||'').slice(0,10)===dateStr);
   return ev ? (ev.duty_type||'duty') : null;
 }
-// chi ha scuola in questo giorno (lista member_id) - per i bordi colorati
+// chi ha scuola in questo giorno (lista member_id) - rispetta date e vacanze
 function schoolMembersOn(dateStr){
   const wd=(()=>{ let x=new Date(dateStr+'T12:00:00').getDay(); return x===0?7:x; })();
   const ids=new Set();
-  (calSchedules||[]).forEach(s=>{ if(s.weekday===wd && /scuola/i.test(s.label||'')) ids.add(s.member_id); });
+  (calSchedules||[]).forEach(s=>{
+    if(s.weekday!==wd) return;
+    if(!/scuola|infanzia|nido|elem|medie/i.test((s.label||'')+(s.kind||''))) return;
+    // rispetta il periodo dell'attività, se impostato
+    if(s.start_date && dateStr < s.start_date) return;
+    if(s.end_date && dateStr > s.end_date) return;
+    // sospendi se quel membro è in vacanza/assenza quel giorno
+    const inVacanza = (calExceptions||[]).some(x=> x.member_id===s.member_id && x.kind!=='festa' && dateStr>=x.start_date && dateStr<=x.end_date);
+    if(inVacanza) return;
+    ids.add(s.member_id);
+  });
   return [...ids];
 }
 
@@ -238,8 +251,15 @@ function renderWeek(){
     const d = new Date(dateStr+'T12:00:00');
     const cell=document.createElement('div'); cell.className='wday';
     if(dateStr===state.cal.selDate) cell.classList.add('sel');
+    // barre: turno (alto) + scuola (basso)
+    const shadows=[];
+    const duty=myDutyOn(dateStr);
+    if(duty && DUTY_BAR[duty] && dateStr!==state.cal.selDate) shadows.push(`inset 0 4px 0 ${DUTY_BAR[duty]}`);
+    const schKids=schoolMembersOn(dateStr);
+    if(schKids.length){ const colr=state.members.find(m=>m.id===schKids[0])?.color||'#ffaa3c'; shadows.push(`inset 0 -3px 0 ${hexA(colr,.45)}`); }
+    if(shadows.length) cell.style.boxShadow=shadows.join(', ');
     const evs=eventsForDay(dateStr);
-    const cats=[...new Set(evs.map(e=>e.category))].slice(0,3);
+    const cats=[...new Set(evs.filter(e=>e.category!=='lavoro').map(e=>e.category))].slice(0,3);
     const pips=cats.map(c=>`<span class="wpip" style="background:${CAT_COLORS[c]||'var(--ink-soft)'}"></span>`).join('');
     cell.innerHTML=`<span class="wn">${DOW_IT[i]}</span><span class="wd">${d.getDate()}</span><span class="wpips">${pips}</span>`;
     cell.onclick=()=>{ state.cal.selDate=dateStr; renderWeek(); renderDayAgenda(); };
@@ -424,11 +444,12 @@ $('ev-delete').addEventListener('click', async ()=>{
 // ============================================================
 document.querySelectorAll('#cal-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
+    // pillola azione "+ Roster": apre direttamente il file picker, non cambia sezione
+    if(s.dataset.act==='roster'){ $('roster-file').click(); return; }
     document.querySelectorAll('#cal-subnav .s').forEach(x=>x.classList.remove('on'));
     s.classList.add('on');
-    ['cal-agenda','cal-voli','cal-scuola'].forEach(id=>$(id).classList.remove('on'));
+    ['cal-agenda','cal-voli','cal-scuola'].forEach(id=>{ const el=$(id); if(el) el.classList.remove('on'); });
     $(s.dataset.s).classList.add('on');
-    // FAB visibile solo in Agenda
     const fab=$('fab-event'); if(fab) fab.classList.toggle('hidden', s.dataset.s!=='cal-agenda');
     if(s.dataset.s==='cal-scuola') openScuola();
   });
@@ -740,6 +761,9 @@ function openActModal(label, items){
   });
   $('act-start').value = items?.[0]?.start_time ? (items[0].start_time||'').slice(0,5) : '';
   $('act-end').value = items?.[0]?.end_time ? (items[0].end_time||'').slice(0,5) : '';
+  $('act-kind').value = items?.[0]?.kind || '';
+  $('act-from').value = items?.[0]?.start_date || '';
+  $('act-to').value = items?.[0]?.end_date || '';
   $('act-delete').style.display = label ? 'block' : 'none';
   clearError('act-error');
   $('act-modal').classList.remove('hidden');
@@ -755,13 +779,15 @@ $('act-save').addEventListener('click', async ()=>{
   const days=[...document.querySelectorAll('#act-days .dp.on')].map(b=>parseInt(b.dataset.wd));
   if(days.length===0){ showError('act-error','Scegli almeno un giorno.'); return; }
   const st=$('act-start').value||null, en=$('act-end').value||null;
+  const kind=$('act-kind').value||null;
+  const sd=$('act-from').value||null, ed=$('act-to').value||null;
 
   // se sto modificando, rimuovo le righe vecchie di quel label
   if(editingActLabel){
     const { data: old } = await sb.from('member_schedules').select('id').eq('member_id',schMemberId).eq('label',editingActLabel);
     for(const o of (old||[])){ await sb.from('member_schedules').delete().eq('id',o.id); }
   }
-  const rows = days.map(wd=>({ member_id:schMemberId, weekday:wd, start_time:st, end_time:en, label, active:true }));
+  const rows = days.map(wd=>({ member_id:schMemberId, weekday:wd, start_time:st, end_time:en, label, kind, start_date:sd, end_date:ed, active:true }));
   const { error } = await sb.from('member_schedules').insert(rows);
   if(error){ showError('act-error','Errore: '+error.message); return; }
   $('act-modal').classList.add('hidden'); loadScuola();

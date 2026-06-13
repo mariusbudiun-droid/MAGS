@@ -487,7 +487,7 @@ document.querySelectorAll('#soldi-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
     document.querySelectorAll('#soldi-subnav .s').forEach(x=>x.classList.remove('on'));
     s.classList.add('on');
-    ['sol-pan','sol-mov','sol-bud','sol-bol','sol-obi','sol-con'].forEach(id=>$(id).classList.remove('on'));
+    ['sol-pan','sol-mov','sol-bol','sol-obi','sol-con'].forEach(id=>$(id).classList.remove('on'));
     $(s.dataset.s).classList.add('on');
   });
 });

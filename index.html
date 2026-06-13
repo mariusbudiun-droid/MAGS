@@ -123,8 +123,8 @@
 
       <div class="subnav" id="cal-subnav">
         <div class="s on" data-s="cal-agenda">Agenda</div>
-        <div class="s" data-s="cal-voli">Voli</div>
-        <div class="s" data-s="cal-scuola">Scuola</div>
+        <div class="s" data-act="roster">+ Roster</div>
+        <div class="s" data-s="cal-scuola">Orari bambini</div>
       </div>
 
       <!-- sotto: agenda -->
@@ -225,10 +225,9 @@
       <div class="subnav" id="soldi-subnav">
         <div class="s on" data-s="sol-pan">Panoramica</div>
         <div class="s" data-s="sol-mov">Movimenti</div>
-        <div class="s" data-s="sol-bud">Buste</div>
         <div class="s" data-s="sol-bol">Bollette</div>
         <div class="s" data-s="sol-obi">Obiettivi</div>
-        <div class="s" data-s="sol-con">Conti</div>
+        <div class="s" data-s="sol-con">Conti e buste</div>
       </div>
 
       <div class="sub on" id="sol-pan">
@@ -246,11 +245,6 @@
         <div class="card" id="sol-txlist" style="padding:6px 16px;"></div>
       </div>
 
-      <div class="sub" id="sol-bud">
-        <div class="sec-row"><h2>Buste</h2><button class="editbtn" id="sol-add-budget">+ Nuova</button></div>
-        <div class="card" id="sol-budgetlist" style="padding:16px;"></div>
-      </div>
-
       <div class="sub" id="sol-bol">
         <div class="sec-row"><h2>Scadenze ricorrenti</h2><button class="editbtn" id="sol-add-bill">+ Aggiungi</button></div>
         <div class="card" id="sol-billlist" style="padding:6px 16px;"></div>
@@ -264,6 +258,8 @@
       <div class="sub" id="sol-con">
         <div class="sec-row"><h2>Conti</h2></div>
         <div class="card" id="sol-accountlist" style="padding:6px 16px;"></div>
+        <div class="sec-row"><h2>Buste</h2><button class="editbtn" id="sol-add-budget">+ Nuova</button></div>
+        <div class="card" id="sol-budgetlist" style="padding:16px;"></div>
         <div class="sec-row"><h2>Categorie</h2><button class="editbtn" id="sol-add-cat">+ Aggiungi</button></div>
         <div class="card" id="sol-catlist" style="padding:6px 16px;"></div>
       </div>
@@ -334,11 +330,35 @@
       <h2 class="modal-title" id="act-modal-title">Nuova attività</h2>
       <label class="field-label">Nome</label>
       <input class="field" id="act-label" placeholder="Es. Nuoto, Scuola, Ginnastica">
+      <label class="field-label">Tipo</label>
+      <select class="field" id="act-kind">
+        <option value="">— Attività generica —</option>
+        <optgroup label="Scuola">
+          <option value="nido">Asilo nido</option>
+          <option value="infanzia">Scuola dell'infanzia</option>
+          <option value="elem1">Elementari · 1ª</option>
+          <option value="elem2">Elementari · 2ª</option>
+          <option value="elem3">Elementari · 3ª</option>
+          <option value="elem4">Elementari · 4ª</option>
+          <option value="elem5">Elementari · 5ª</option>
+          <option value="medie">Scuola media</option>
+        </optgroup>
+        <optgroup label="Extra-scolastica">
+          <option value="sport">Sport</option>
+          <option value="musica">Musica</option>
+          <option value="lingua">Lingua</option>
+          <option value="altro">Altro</option>
+        </optgroup>
+      </select>
       <label class="field-label">Giorni</label>
       <div class="daypick" id="act-days"></div>
       <div class="row2">
         <div style="flex:1"><label class="field-label">Inizio</label><input class="field" id="act-start" type="time"></div>
         <div style="flex:1"><label class="field-label">Fine</label><input class="field" id="act-end" type="time"></div>
+      </div>
+      <div class="row2">
+        <div style="flex:1"><label class="field-label">Dal</label><input class="field" id="act-from" type="date"></div>
+        <div style="flex:1"><label class="field-label">Al</label><input class="field" id="act-to" type="date"></div>
       </div>
       <button class="btn-primary" id="act-save">Salva</button>
       <button class="btn-ghost" id="act-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
