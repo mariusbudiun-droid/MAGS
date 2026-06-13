@@ -10,7 +10,7 @@
 <link rel="icon" href="icons/favicon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@500;600;700&family=Spectral:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&family=Baloo+2:wght@500;600;700;800&family=Quicksand:wght@500;600;700&family=Spectral:wght@500;600;700&family=Instrument+Sans:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&family=Archivo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -117,6 +117,14 @@
         <button class="theme-opt" data-fam="aurora">Aurora</button>
         <button class="theme-opt" data-fam="linen">Linen</button>
         <button class="theme-opt" data-fam="cockpit">Cockpit</button>
+        <button class="theme-opt" data-fam="inchiostro">Inchiostro</button>
+        <button class="theme-opt" data-fam="bosco">Bosco</button>
+        <button class="theme-opt" data-fam="notte">Notte</button>
+        <button class="theme-opt" data-fam="ciliegia">Ciliegia</button>
+        <button class="theme-opt" data-fam="agrume">Agrume</button>
+        <button class="theme-opt" data-fam="sabbia">Sabbia</button>
+        <button class="theme-opt" data-fam="neve">Neve</button>
+        <button class="theme-opt" data-fam="porcellana">Porcellana</button>
       </div>
       <label class="field-label">Luminosità</label>
       <div class="theme-grid three" id="theme-lum">
@@ -416,10 +424,13 @@
   <div class="modal hidden" id="listcfg-modal">
     <div class="modal-card">
       <h2 class="modal-title">Impostazioni lista</h2>
-      <label class="field-label">Budget / categoria su cui scalare</label>
+      <label class="field-label">Busta collegata (🧧 = ha già i soldi)</label>
       <select class="field" id="lc-category"></select>
-      <label class="field-label">Conto da cui esce la spesa</label>
-      <select class="field" id="lc-account"></select>
+      <div id="lc-account-wrap">
+        <label class="field-label">Conto da cui esce la spesa</label>
+        <select class="field" id="lc-account"></select>
+        <p class="placeholder-text" style="font-size:11px;margin-top:4px;">Usato solo se la lista non ha una busta.</p>
+      </div>
       <button class="btn-primary" id="lc-save">Salva</button>
       <button class="btn-ghost" id="lc-cancel" style="margin-top:8px;">Annulla</button>
       <p class="auth-error hidden" id="lc-error"></p>

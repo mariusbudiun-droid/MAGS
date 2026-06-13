@@ -59,7 +59,9 @@ async function loadSoldiAll(){
   ]);
   soldi.transactions = tx||[];
   soldi.budgets = bud||[];
-  soldi.bills = bills||[];
+  // bollette: nascondi quelle la cui scadenza è passata da più di 30 giorni
+  const limite = new Date(Date.now() - 30*86400000).toISOString().slice(0,10);
+  soldi.bills = (bills||[]).filter(b => !b.next_due || b.next_due >= limite);
   soldi.goals = goals||[];
 }
 

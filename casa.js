@@ -35,27 +35,8 @@ function renderListPills(){
   const add=document.createElement('div'); add.className='listpill add'; add.textContent='+ Lista';
   add.onclick=async ()=>{
     const name=prompt('Nome della nuova lista (es. Spesa, Farmacia):'); if(!name) return;
-    const nome=name.trim();
-    const conBusta=confirm(`Vuoi creare anche una busta "${nome}" collegata a questa lista?\n\nOK = sì, crea busta · Annulla = solo lista`);
-    // crea la lista
-    const { data: lista } = await sb.from('shopping_lists').insert({ household_id:state.household.id, name:nome, sort_order:casaState.lists.length }).select().single();
-    if(!lista) return;
-    if(conBusta){
-      const importo=parseFloat((prompt('Quanto mettere nella busta? (€)','0')||'0').replace(',','.'))||0;
-      // crea categoria omonima + busta, collega la lista
-      let { data: cat } = await sb.from('categories').insert({ household_id:state.household.id, name:nome, icon:'🛒', kind:'spesa' }).select().single();
-      if(cat){
-        const { data: bud } = await sb.from('budgets').insert({ household_id:state.household.id, category_id:cat.id, monthly_limit:importo, balance:importo }).select().single();
-        // collega la lista a categoria + conto comune
-        const corrente=(await sb.from('accounts').select('*').eq('household_id',state.household.id).eq('kind','comune').maybeSingle()).data;
-        await sb.from('shopping_lists').update({ category_id:cat.id, account_id:corrente?.id||null }).eq('id', lista.id);
-        if(importo>0 && corrente){
-          await sb.from('accounts').update({ balance:(+corrente.balance||0)-importo }).eq('id', corrente.id);
-          await sb.from('transactions').insert({ household_id:state.household.id, kind:'giroconto', amount:importo, from_account:corrente.id, to_budget:bud?.id||null, description:`Busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
-        }
-      }
-    }
-    casaState.currentList=lista.id; await loadLists();
+    const { data: lista } = await sb.from('shopping_lists').insert({ household_id:state.household.id, name:name.trim(), sort_order:casaState.lists.length }).select().single();
+    if(lista){ casaState.currentList=lista.id; await loadLists(); }
   };
   wrap.appendChild(add);
 }
@@ -114,31 +95,42 @@ async function addItem(){
 $('casa-additem').addEventListener('click', addItem);
 $('casa-newitem').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
 
-// ---- impostazioni lista: categoria (budget) + conto ----
+// ---- impostazioni lista: busta (categoria) + conto (solo se no busta) ----
 async function openListConfig(){
   if(!casaState.currentList){ return; }
   const list = casaState.lists.find(l=>l.id===casaState.currentList);
-  // carica categorie di uscita e conti
-  const [{ data: cats }, { data: accs }] = await Promise.all([
+  const [{ data: cats }, { data: accs }, { data: buds }] = await Promise.all([
     sb.from('categories').select('*').eq('household_id', state.household.id).order('name'),
     sb.from('accounts').select('*').eq('household_id', state.household.id).order('name'),
+    sb.from('budgets').select('category_id').eq('household_id', state.household.id),
   ]);
+  const budgetCats = new Set((buds||[]).map(b=>b.category_id));
+  listCfgBudgetCats = budgetCats; // memorizzo per il toggle
   const catSel=$('lc-category');
   catSel.innerHTML = `<option value="">— nessuna —</option>` +
-    (cats||[]).map(c=>`<option value="${c.id}"${list.category_id===c.id?' selected':''}>${c.icon?c.icon+' ':''}${c.name}</option>`).join('') +
+    (cats||[]).map(c=>`<option value="${c.id}"${list.category_id===c.id?' selected':''}>${budgetCats.has(c.id)?'🧧 ':''}${c.icon?c.icon+' ':''}${c.name}</option>`).join('') +
     `<option value="__new__">+ Nuova categoria…</option>`;
   const accSel=$('lc-account');
   accSel.innerHTML = (accs||[]).map(a=>`<option value="${a.id}"${list.account_id===a.id?' selected':''}>${a.name}</option>`).join('');
+  toggleListConfigConto();
   clearError('lc-error');
   $('listcfg-modal').classList.remove('hidden');
+}
+let listCfgBudgetCats = new Set();
+// mostra il campo conto solo se la categoria scelta NON ha una busta
+function toggleListConfigConto(){
+  const cat=$('lc-category').value;
+  const hasBudget = cat && listCfgBudgetCats.has(cat);
+  const accWrap=$('lc-account-wrap');
+  if(accWrap) accWrap.style.display = hasBudget ? 'none' : 'block';
 }
 $('lista-config').addEventListener('click', openListConfig);
 $('lc-cancel').addEventListener('click', ()=>$('listcfg-modal').classList.add('hidden'));
 $('listcfg-modal').addEventListener('click', e=>{ if(e.target.id==='listcfg-modal') $('listcfg-modal').classList.add('hidden'); });
 
-// creazione categoria al volo
+// creazione categoria al volo + toggle conto
 $('lc-category').addEventListener('change', async (e)=>{
-  if(e.target.value!=='__new__') return;
+  if(e.target.value!=='__new__'){ toggleListConfigConto(); return; }
   const name=prompt('Nome della nuova categoria di spesa:');
   if(!name){ e.target.value=''; return; }
   const { data } = await sb.from('categories').insert({
@@ -183,30 +175,40 @@ $('sf-save').addEventListener('click', async ()=>{
   if(isNaN(amount) || amount<=0){ showError('sf-error','Inserisci un importo valido.'); return; }
   const list = casaState.lists.find(l=>l.id===casaState.currentList);
 
-  // registra la transazione SOLO se la lista ha categoria e conto collegati
-  if(list.category_id && list.account_id){
-    const { error: txErr } = await sb.from('transactions').insert({
-      household_id: state.household.id,
-      account_id: list.account_id,
-      category_id: list.category_id,
-      member_id: state.me ? state.me.id : null,
-      kind: 'uscita',
-      amount,
-      description: `Spesa · ${list.name}`,
-      tx_date: new Date().toISOString().slice(0,10),
-    });
-    if(txErr){ showError('sf-error','Errore registrazione: '+txErr.message); return; }
-
-    // scala dalla busta (budget) collegata a quella categoria, se esiste
-    const { data: bud } = await sb.from('budgets').select('*')
-      .eq('household_id', state.household.id).eq('category_id', list.category_id).maybeSingle();
-    if(bud){
-      const nuovo = Math.max(0, (+bud.balance||0) - amount);
-      await sb.from('budgets').update({ balance: nuovo }).eq('id', bud.id);
-    }
-  } else {
-    showError('sf-error','Collega prima categoria e conto con ⚙︎');
+  if(!list.category_id && !list.account_id){
+    showError('sf-error','Collega prima una busta o un conto con ⚙︎');
     return;
+  }
+
+  // c'è una busta su questa categoria?
+  let bud=null;
+  if(list.category_id){
+    const { data } = await sb.from('budgets').select('*')
+      .eq('household_id', state.household.id).eq('category_id', list.category_id).maybeSingle();
+    bud=data;
+  }
+
+  // registra la transazione (riferita alla busta se c'è, altrimenti al conto)
+  const txPayload={
+    household_id: state.household.id,
+    category_id: list.category_id||null,
+    member_id: state.me ? state.me.id : null,
+    kind: 'uscita', amount,
+    description: `Spesa · ${list.name}`,
+    tx_date: new Date().toISOString().slice(0,10),
+  };
+  if(bud){ txPayload.from_budget=bud.id; }       // la spesa esce dalla busta
+  else { txPayload.account_id=list.account_id||null; }  // o dal conto
+  const { error: txErr } = await sb.from('transactions').insert(txPayload);
+  if(txErr){ showError('sf-error','Errore registrazione: '+txErr.message); return; }
+
+  if(bud){
+    // scala SOLO dalla busta (i soldi erano già usciti dal conto quando la busta è stata riempita)
+    await sb.from('budgets').update({ balance: (+bud.balance||0) - amount }).eq('id', bud.id);
+  } else if(list.account_id){
+    // nessuna busta: scala dal conto
+    const { data: acc } = await sb.from('accounts').select('*').eq('id', list.account_id).maybeSingle();
+    if(acc) await sb.from('accounts').update({ balance: (+acc.balance||0) - amount }).eq('id', acc.id);
   }
 
   // cancella gli articoli spuntati, lascia i non presi
