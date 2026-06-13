@@ -133,7 +133,7 @@ function renderMonth(){
     const schKids=schoolMembersOn(dateStr);
     if(schKids.length){
       const colr = state.members.find(m=>m.id===schKids[0])?.color || '#ffaa3c';
-      cell.style.boxShadow = `inset 0 -3px 0 ${hexA(colr,.55)}`;
+      cell.style.boxShadow = `inset 0 -2px 0 ${hexA(colr,.3)}`;
     }
     const evs=eventsForDay(dateStr);
     cell.innerHTML=`<span class="mg-n">${d}</span><span class="mg-chips">${dayChips(evs,6)}</span>`;
