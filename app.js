@@ -579,13 +579,16 @@ function refreshPatternToggle(){
   const on = localStorage.getItem('mags_pattern')==='1';
   btn.textContent = 'Proiezione turni: '+(on?'ATTIVA':'spenta');
   btn.style.color = on ? 'var(--accent)' : '';
-  const inp=$('pattern-anchor'); if(inp) inp.value = localStorage.getItem('mags_pattern_anchor')||'';
+  const inp=$('pattern-anchor');
+  if(inp && state.me) inp.value = localStorage.getItem('mags_anchor_'+state.me.id)||'';
 }
-// salva la data ancora e ridisegna
+// salva la data ancora del membro loggato e ridisegna
 document.addEventListener('change', (e)=>{
   if(e.target && e.target.id==='pattern-anchor'){
-    if(e.target.value) localStorage.setItem('mags_pattern_anchor', e.target.value);
-    else localStorage.removeItem('mags_pattern_anchor');
+    if(!state.me) return;
+    const key='mags_anchor_'+state.me.id;
+    if(e.target.value) localStorage.setItem(key, e.target.value);
+    else localStorage.removeItem(key);
     if(typeof openCalendar==='function') openCalendar();
   }
 });

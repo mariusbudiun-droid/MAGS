@@ -149,21 +149,15 @@ function daysBetween(a,b){
   return Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00'))/86400000);
 }
 function projectedDuty(memberId, dateStr){
-  // 1) ancora manuale impostata dall'utente (ha priorità): è un 1° early → indice 0
-  const manual = localStorage.getItem('mags_pattern_anchor');
+  // ancora manuale PER PERSONA (solo chi l'ha impostata viene proiettato)
+  const manual = localStorage.getItem('mags_anchor_'+memberId);
   if(manual){
     const delta = daysBetween(manual, dateStr);
     let pos = delta % CYCLE_LEN; if(pos<0) pos += CYCLE_LEN;
     return CYCLE[pos];
   }
-  // 2) altrimenti ancora automatica dal roster
-  if(!(memberId in patternAnchors)) patternAnchors[memberId]=computeAnchor(memberId);
-  const anchor = patternAnchors[memberId];
-  if(!anchor) return null;
-  const delta = daysBetween(anchor.anchorDate, dateStr);
-  let pos = (anchor.anchorIndex + delta) % CYCLE_LEN;
-  if(pos<0) pos += CYCLE_LEN;
-  return CYCLE[pos];
+  // nessuna ancora per questo membro → nessuna proiezione
+  return null;
 }
 // il mio turno (compatibilità con vista settimana)
 function myDutyOn(dateStr){ return state.me ? dutyOfMemberOn(state.me.id, dateStr) : null; }
