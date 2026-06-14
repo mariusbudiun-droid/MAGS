@@ -45,6 +45,7 @@ Rules:
 - If a day shows flight numbers and routes, it's a flight day
 - HSBY = Home Standby, AD = Airport Duty
 - OFF = day off (including rest days)
+- AL = Annual Leave / holidays / ferie. Recognise it also when shown as "ANNUAL LEAVE", "A/L", "AL", "HOL", "LEAVE", "FERIE". Mark these days as type "al" — INCLUDING days far in the future. Always capture every annual-leave day visible, even months ahead.
 - Only include days clearly visible in the screenshot
 
 Respond ONLY with a valid JSON array, no markdown, no explanation:
