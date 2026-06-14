@@ -437,15 +437,16 @@
       <h2 class="modal-title" id="event-modal-title">Nuovo evento</h2>
       <label class="field-label">Titolo</label>
       <input class="field" id="ev-title" placeholder="Es. Visita pediatra">
-      <label class="field-label">Chi</label>
-      <select class="field" id="ev-member"></select>
+      <label class="field-label">Chi (puoi sceglierne più di uno)</label>
+      <div class="memberpick" id="ev-members"></div>
       <label class="field-label">Tipo</label>
       <select class="field" id="ev-category">
         <option value="appuntamento">Appuntamento</option>
+        <option value="salute">Visita / Salute</option>
+        <option value="viaggio">Viaggio / Vacanza</option>
+        <option value="scuola">Scuola / attività</option>
+        <option value="famiglia">Famiglia (tutti)</option>
         <option value="lavoro">Lavoro</option>
-        <option value="scuola">Scuola</option>
-        <option value="salute">Salute</option>
-        <option value="famiglia">Famiglia</option>
       </select>
       <label class="field-label">Data</label>
       <input class="field" id="ev-date" type="date">

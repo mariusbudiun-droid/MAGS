@@ -342,7 +342,7 @@ function renderDayAgenda(){
   const evs = eventsForDay(sel);
   if(evs.length===0){ wrap.innerHTML='<div class="ev-empty">Nessun evento. Tocca + per aggiungerne uno.</div>'; return; }
   evs.forEach(e=>{
-    const t = e.all_day ? 'tutto il giorno' : (e.start_at||'').slice(11,16);
+    const t = e.all_day ? 'all-day' : (e.start_at||'').slice(11,16);
     const mem = state.members.find(m=>m.id===e.member_id);
     const memName = mem ? mem.display_name : '';
     // estrai CI/CO dalla nota (voli da roster)
@@ -407,12 +407,18 @@ $('fab-event').addEventListener('click', ()=> openEventModal(null));
 function openEventModal(ev){
   editingEventId = ev ? ev.id : null;
   $('event-modal-title').textContent = ev ? 'Modifica evento' : 'Nuovo evento';
-  // popola select membri
-  const ms=$('ev-member');
-  ms.innerHTML = '<option value="">— famiglia —</option>' + state.members.map(m=>`<option value="${m.id}">${m.display_name}</option>`).join('');
+  // chip membri (selezione multipla)
+  const mp=$('ev-members'); mp.innerHTML='';
+  state.members.forEach(m=>{
+    const initial=(m.display_name||'?').charAt(0).toUpperCase();
+    const chip=document.createElement('span'); chip.className='mp'; chip.dataset.id=m.id;
+    chip.innerHTML=`<span class="av" style="background:${m.color}">${initial}</span>${m.display_name}`;
+    if(ev && ev.member_id===m.id) chip.classList.add('on');
+    chip.onclick=()=>chip.classList.toggle('on');
+    mp.appendChild(chip);
+  });
 
   $('ev-title').value = ev?.title || '';
-  $('ev-member').value = ev?.member_id || '';
   $('ev-category').value = ev?.category || 'appuntamento';
   $('ev-date').value = ev ? (ev.start_at||'').slice(0,10) : state.cal.selDate;
   $('ev-start').value = ev && !ev.all_day ? (ev.start_at||'').slice(11,16) : '';
@@ -467,11 +473,16 @@ $('ev-save').addEventListener('click', async ()=>{
     end_at = (!allDay && endT) ? `${date}T${endT}:00` : null;
   }
 
-  const payload = {
+  // membri selezionati (chip)
+  const selected = [...document.querySelectorAll('#ev-members .mp.on')].map(c=>c.dataset.id);
+  const category = $('ev-category').value;
+  // categoria "famiglia" = riguarda tutti, nessun membro specifico
+  const memberIds = category==='famiglia' ? [null] : (selected.length ? selected : [null]);
+
+  const base = {
     household_id: state.household.id,
-    member_id: $('ev-member').value || null,
     title,
-    category: $('ev-category').value,
+    category,
     start_at, end_at, all_day: allDay,
     location: $('ev-location').value.trim() || null,
     note: $('ev-note').value.trim() || null,
@@ -481,9 +492,12 @@ $('ev-save').addEventListener('click', async ()=>{
   const btn=$('ev-save'); btn.disabled=true; btn.textContent='Salvataggio…';
   let error;
   if(editingEventId){
-    ({ error } = await sb.from('events').update(payload).eq('id', editingEventId));
+    // in modifica aggiorno il singolo evento col primo membro selezionato
+    ({ error } = await sb.from('events').update({ ...base, member_id: memberIds[0]||null }).eq('id', editingEventId));
   } else {
-    ({ error } = await sb.from('events').insert(payload));
+    // creo un evento per ogni membro selezionato
+    const rows = memberIds.map(mid=>({ ...base, member_id: mid }));
+    ({ error } = await sb.from('events').insert(rows));
   }
   btn.disabled=false; btn.textContent='Salva evento';
   if(error){ showError('ev-error','Errore: '+error.message); return; }

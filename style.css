@@ -296,6 +296,10 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .rday .rbadge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:var(--pill);background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);text-transform:uppercase;margin-left:6px;}
 
 /* scuola: selettore giorni */
+.memberpick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px;}
+.memberpick .mp{display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:20px;border:1px solid var(--line);background:var(--surface2);font-weight:600;font-size:13px;color:var(--ink-soft);cursor:pointer;}
+.memberpick .mp .av{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:11px;}
+.memberpick .mp.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--ink);}
 .daypick{display:flex;gap:6px;margin-bottom:4px;max-width:100%;}
 .daypick .dp{flex:1 1 0;min-width:0;text-align:center;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--surface2);font-weight:700;font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:var(--mono);}
 .daypick .dp.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}

@@ -38,8 +38,8 @@ const state = {
   },
 };
 
-const CAT_COLORS = { lavoro:'var(--accent)', scuola:'#ffaa3c', appuntamento:'#9d7bff', salute:'#22b8a6', famiglia:'#7a85a8' };
-const CAT_LABELS = { lavoro:'Lavoro', scuola:'Scuola', appuntamento:'Appuntamento', salute:'Salute', famiglia:'Famiglia' };
+const CAT_COLORS = { lavoro:'var(--accent)', scuola:'#ffaa3c', appuntamento:'#9d7bff', salute:'#22b8a6', famiglia:'#7a85a8', viaggio:'#f5915c' };
+const CAT_LABELS = { lavoro:'Lavoro', scuola:'Scuola', appuntamento:'Appuntamento', salute:'Salute', famiglia:'Famiglia', viaggio:'Viaggio' };
 
 // ordina i membri secondo le lettere di MAGS (Marius, Alice, Giada, Samuel),
 // gli altri in coda in ordine alfabetico
