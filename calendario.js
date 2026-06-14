@@ -497,31 +497,73 @@ $('ev-save').addEventListener('click', async ()=>{
 
 $('ev-delete').addEventListener('click', async ()=>{
   if(!editingEventId) return;
-  // trova l'evento corrente per capire se fa parte di una serie (stesso titolo+membro+source manuale)
   const ev = state.cal.events.find(e=>e.id===editingEventId);
-  let scope='one';
+  const selDay = state.cal.selDate; // il giorno che stai guardando
+
+  // CASO A — periodo (serie di eventi manuali con stesso titolo+membro)
   if(ev && ev.source==='manuale' && ev.member_id && ev.title){
-    // conta quanti altri eventi della stessa serie esistono
     const serie = state.cal.events.filter(e=>e.source==='manuale' && e.member_id===ev.member_id && e.title===ev.title);
     if(serie.length>1){
       const r = confirm(`"${ev.title}" è un periodo su ${serie.length} giorni.\n\nOK = elimina TUTTO il periodo\nAnnulla = elimina solo questo giorno`);
-      scope = r ? 'all' : 'one';
+      let error;
+      if(r){ ({error}=await sb.from('events').delete().eq('household_id',state.household.id).eq('member_id',ev.member_id).eq('title',ev.title).eq('source','manuale')); }
+      else { ({error}=await sb.from('events').delete().eq('id', editingEventId)); }
+      if(error){ showError('ev-error','Errore: '+error.message); return; }
+      closeEventModal(); await applyCalView(); return;
     }
   }
-  let error;
-  if(scope==='all'){
-    ({ error } = await sb.from('events').delete()
-      .eq('household_id', state.household.id)
-      .eq('member_id', ev.member_id)
-      .eq('title', ev.title)
-      .eq('source','manuale'));
-  } else {
-    ({ error } = await sb.from('events').delete().eq('id', editingEventId));
+
+  // CASO B — evento multi-giorno (un solo record con start/end su giorni diversi)
+  const startDay=(ev?.start_at||'').slice(0,10), endDay=(ev?.end_at||'').slice(0,10);
+  if(ev && endDay && endDay>startDay){
+    const r = confirm(`"${ev.title}" dura dal ${startDay} al ${endDay}.\n\nOK = elimina TUTTO l'evento\nAnnulla = togli solo il giorno ${selDay}`);
+    if(r){
+      const { error } = await sb.from('events').delete().eq('id', editingEventId);
+      if(error){ showError('ev-error','Errore: '+error.message); return; }
+    } else {
+      // togli solo selDay: accorcia o spezza in due
+      await splitMultiDay(ev, selDay);
+    }
+    closeEventModal(); await applyCalView(); return;
   }
+
+  // CASO C — evento singolo
+  const { error } = await sb.from('events').delete().eq('id', editingEventId);
   if(error){ showError('ev-error','Errore: '+error.message); return; }
   closeEventModal();
   await applyCalView();
 });
+
+// rimuove un singolo giorno da un evento multi-giorno (accorcia o spezza in due)
+async function splitMultiDay(ev, dayStr){
+  const startDay=(ev.start_at||'').slice(0,10), endDay=(ev.end_at||'').slice(0,10);
+  const startTime=(ev.start_at||'').slice(10), endTime=(ev.end_at||'').slice(10);
+  if(dayStr<startDay || dayStr>endDay) return; // fuori range, niente
+  const dayBefore = new Date(dayStr+'T12:00:00'); dayBefore.setDate(dayBefore.getDate()-1);
+  const dayAfter  = new Date(dayStr+'T12:00:00'); dayAfter.setDate(dayAfter.getDate()+1);
+  const dB=dayBefore.toISOString().slice(0,10), dA=dayAfter.toISOString().slice(0,10);
+
+  if(dayStr===startDay && dayStr===endDay){
+    // un solo giorno: elimina del tutto
+    await sb.from('events').delete().eq('id', ev.id);
+  } else if(dayStr===startDay){
+    // togli il primo giorno: l'evento parte dal giorno dopo
+    await sb.from('events').update({ start_at: dA+startTime }).eq('id', ev.id);
+  } else if(dayStr===endDay){
+    // togli l'ultimo giorno: l'evento finisce il giorno prima
+    await sb.from('events').update({ end_at: dB+endTime }).eq('id', ev.id);
+  } else {
+    // giorno in mezzo: accorcia l'attuale fino al giorno prima, crea un nuovo troncone dopo
+    await sb.from('events').update({ end_at: dB+endTime }).eq('id', ev.id);
+    await sb.from('events').insert({
+      household_id: ev.household_id, member_id: ev.member_id, title: ev.title,
+      category: ev.category, duty_type: ev.duty_type||null,
+      start_at: dA+startTime, end_at: endDay+endTime,
+      all_day: ev.all_day, location: ev.location||null, note: ev.note||null,
+      source: ev.source||'manuale', created_by: state.me?state.me.id:null,
+    });
+  }
+}
 
 // ============================================================
 // ============================================================
