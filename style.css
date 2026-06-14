@@ -80,6 +80,12 @@ body[data-fam="porcellana"]{ --display:'Archivo',sans-serif; --body:'Archivo',sa
 body[data-fam="porcellana"][data-lum="light"]{ --bg:#f4f4f5; --surface:#fff; --surface2:#ececef; --ink:#18181b; --ink-soft:#71717a; --line:#e4e4e7; --line-soft:#ececef; --accent:#18181b; --accent-ink:#fff; --shadow:0 6px 18px rgba(0,0,0,.06); }
 body[data-fam="porcellana"][data-lum="dark"]{ --bg:#09090b; --surface:#18181b; --surface2:#131316; --ink:#fafafa; --ink-soft:#a1a1aa; --line:#27272a; --line-soft:#1c1c1f; --accent:#fafafa; --accent-ink:#09090b; --shadow:0 12px 34px rgba(0,0,0,.6); }
 
+/* ---- iOS (look impostazioni Apple: grigio di sistema, celle bianche, blu di sistema) ---- */
+body[data-fam="ios"]{ --display:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif; --body:-apple-system,'SF Pro Text','Helvetica Neue',sans-serif; --mono:ui-monospace,'SF Mono',monospace; --radius:12px; --av-r:10px; --pill:18px;
+  --accent:#007aff; --accent-2:#5ac8fa; --grad:linear-gradient(135deg,#007aff,#5ac8fa); }
+body[data-fam="ios"][data-lum="light"]{ --bg:#f2f2f7; --surface:#ffffff; --surface2:#f2f2f7; --ink:#000000; --ink-soft:#8e8e93; --line:#e5e5ea; --line-soft:#eeeef0; --accent:#007aff; --accent-ink:#fff; --shadow:0 1px 0 rgba(0,0,0,.04); }
+body[data-fam="ios"][data-lum="dark"]{ --bg:#000000; --surface:#1c1c1e; --surface2:#2c2c2e; --ink:#ffffff; --ink-soft:#8e8e93; --line:#38383a; --line-soft:#2c2c2e; --accent:#0a84ff; --accent-ink:#fff; --shadow:0 1px 0 rgba(0,0,0,.3); }
+
 /* fallback se il tema non è ancora impostato */
 body:not([data-fam]){ --display:'Sora',sans-serif; --body:'Sora',sans-serif; --mono:'Space Mono',monospace; --radius:20px; --av-r:16px; --pill:30px;
   --bg:#f3f7ff; --surface:#fff; --surface2:#eef3ff; --ink:#28304a; --ink-soft:#7a85a8; --line:#dde6fb; --line-soft:#eef3ff;
