@@ -465,6 +465,7 @@ document.querySelectorAll('#cal-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
     // pillola azione "+ Roster": apre direttamente il file picker, non cambia sezione
     if(s.dataset.act==='roster'){ $('roster-file').click(); return; }
+    if(s.dataset.act==='periodo'){ openSpecialModal(); return; }
     document.querySelectorAll('#cal-subnav .s').forEach(x=>x.classList.remove('on'));
     s.classList.add('on');
     ['cal-agenda','cal-voli','cal-scuola'].forEach(id=>{ const el=$(id); if(el) el.classList.remove('on'); });
@@ -848,4 +849,84 @@ $('exc-save').addEventListener('click', async ()=>{
 $('exc-delete').addEventListener('click', async ()=>{
   if(editingExc){ await sb.from('schedule_exceptions').delete().eq('id',editingExc); }
   $('exc-modal').classList.add('hidden'); loadScuola();
+});
+
+// ============================================================
+// PERIODO SPECIALE (maternità, allattamento, ferie, congedo)
+// crea eventi 'lavoro' col duty_type giusto su un intervallo di date
+// ============================================================
+function openSpecialModal(){
+  const sel=$('sp-member');
+  // solo adulti (hanno il riquadro sx/dx)
+  const adulti = state.members.filter(m=>!m.is_expected && (m.member_type==='adulto' || m.occupation==='cabin_crew' || m.occupation==='lavoro'));
+  sel.innerHTML = adulti.map(m=>`<option value="${m.id}">${m.display_name}</option>`).join('');
+  $('sp-label').value=''; $('sp-from').value=''; $('sp-to').value='';
+  $('sp-start-time').value=''; $('sp-end-time').value='';
+  // daypick
+  const dp=$('sp-days'); const dom=['LU','MA','ME','GI','VE','SA','DO'];
+  dp.innerHTML = dom.map((d,i)=>`<span class="dp" data-wd="${i+1}">${d}</span>`).join('');
+  dp.querySelectorAll('.dp').forEach(ch=>ch.onclick=()=>ch.classList.toggle('on'));
+  spTypeToggle();
+  clearError('sp-error');
+  $('special-modal').classList.remove('hidden');
+}
+function spTypeToggle(){
+  const t=$('sp-type').value;
+  const atWork = (t==='early'||t==='late');
+  $('sp-time-wrap').style.display = atWork ? 'flex' : 'none';
+}
+$('sp-type').addEventListener('change', spTypeToggle);
+$('sp-cancel').addEventListener('click', ()=>$('special-modal').classList.add('hidden'));
+$('special-modal').addEventListener('click', e=>{ if(e.target.id==='special-modal') $('special-modal').classList.add('hidden'); });
+
+$('sp-save').addEventListener('click', async ()=>{
+  clearError('sp-error');
+  const memberId=$('sp-member').value;
+  const type=$('sp-type').value;
+  const label=$('sp-label').value.trim();
+  const from=$('sp-from').value, to=$('sp-to').value;
+  if(!memberId){ showError('sp-error','Scegli chi.'); return; }
+  if(!from||!to){ showError('sp-error','Imposta le date dal/al.'); return; }
+  if(to<from){ showError('sp-error','La data finale è prima dell\'inizio.'); return; }
+  const atWork = (type==='early'||type==='late');
+  // duty_type per il riquadro: a casa→off/ferie/congedo (verde), ufficio→early/late
+  const dutyMap={ off:'off', ferie:'ferie', congedo:'off', early:'early', late:'late' };
+  const duty=dutyMap[type]||'off';
+  const titleMap={ off:'Maternità', ferie:'Ferie', congedo:'Congedo', early:label||'Ufficio', late:label||'Ufficio' };
+  const title=label||titleMap[type]||'Periodo';
+  const stime=$('sp-start-time').value, etime=$('sp-end-time').value;
+  // giorni selezionati (vuoto = tutti)
+  const wds=[...$('sp-days').querySelectorAll('.dp.on')].map(c=>+c.dataset.wd);
+
+  // genera le date dell'intervallo
+  const rows=[]; const d0=new Date(from+'T12:00:00'), d1=new Date(to+'T12:00:00');
+  for(let d=new Date(d0); d<=d1; d.setDate(d.getDate()+1)){
+    const wd=(d.getDay()===0?7:d.getDay());
+    if(wds.length && !wds.includes(wd)) continue; // solo giorni scelti
+    const ds=d.toISOString().slice(0,10);
+    rows.push({
+      household_id: state.household.id,
+      member_id: memberId,
+      title,
+      category: 'lavoro',
+      duty_type: duty,
+      start_at: atWork && stime ? `${ds}T${stime}:00` : `${ds}T00:00:00`,
+      end_at: atWork && etime ? `${ds}T${etime}:00` : null,
+      all_day: !atWork,
+      source: 'manual',
+      created_by: state.me ? state.me.id : null,
+    });
+  }
+  if(!rows.length){ showError('sp-error','Nessun giorno nell\'intervallo.'); return; }
+  // evita doppioni manuali nelle stesse date per quel membro
+  for(const r of rows){
+    const ds=r.start_at.slice(0,10);
+    await sb.from('events').delete()
+      .eq('household_id', state.household.id).eq('member_id', memberId).eq('source','manual')
+      .gte('start_at', ds+'T00:00:00').lt('start_at', ds+'T23:59:59');
+  }
+  const { error } = await sb.from('events').insert(rows);
+  if(error){ showError('sp-error','Errore: '+error.message); return; }
+  $('special-modal').classList.add('hidden');
+  openCalendar();
 });

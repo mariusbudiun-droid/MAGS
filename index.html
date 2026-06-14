@@ -158,7 +158,8 @@
       <div class="subnav" id="cal-subnav">
         <div class="s on" data-s="cal-agenda">Agenda</div>
         <div class="s" data-act="roster">+ Roster</div>
-        <div class="s" data-s="cal-scuola">Orari bambini</div>
+        <div class="s" data-act="periodo">+ Periodo</div>
+        <div class="s" data-s="cal-scuola">Orari</div>
       </div>
 
       <!-- sotto: agenda -->
@@ -351,6 +352,43 @@
       <button class="btn-ghost" id="act-delete" style="margin-top:8px;display:none;color:#e23b5a;border-color:#e23b5a;">Elimina</button>
       <button class="btn-ghost" id="act-cancel" style="margin-top:8px;">Annulla</button>
       <p class="auth-error hidden" id="act-error"></p>
+    </div>
+  </div>
+
+  <!-- Modal turno speciale / periodo di lavoro -->
+  <div class="modal hidden" id="special-modal">
+    <div class="modal-card">
+      <h2 class="modal-title">Periodo speciale</h2>
+      <label class="field-label">Chi</label>
+      <select class="field" id="sp-member"></select>
+      <label class="field-label">Tipo</label>
+      <select class="field" id="sp-type">
+        <optgroup label="A casa (riquadro verde)">
+          <option value="off">Maternità / a casa</option>
+          <option value="ferie">Ferie</option>
+          <option value="congedo">Congedo</option>
+        </optgroup>
+        <optgroup label="Al lavoro (riquadro turno)">
+          <option value="early">Ufficio mattina (early)</option>
+          <option value="late">Ufficio pomeriggio (late)</option>
+        </optgroup>
+      </select>
+      <label class="field-label">Nome (facoltativo)</label>
+      <input class="field" id="sp-label" placeholder="Es. Maternità, Allattamento">
+      <div class="row2" id="sp-time-wrap" style="display:none;">
+        <div style="flex:1"><label class="field-label">Inizio</label><input class="field" id="sp-start-time" type="time"></div>
+        <div style="flex:1"><label class="field-label">Fine</label><input class="field" id="sp-end-time" type="time"></div>
+      </div>
+      <label class="field-label">Giorni della settimana (se ricorrente)</label>
+      <div class="daypick" id="sp-days"></div>
+      <div class="row2">
+        <div style="flex:1"><label class="field-label">Dal</label><input class="field" id="sp-from" type="date"></div>
+        <div style="flex:1"><label class="field-label">Al</label><input class="field" id="sp-to" type="date"></div>
+      </div>
+      <p class="placeholder-text" style="font-size:11px;">Se non scegli giorni, il periodo copre tutti i giorni (es. maternità). Se scegli i giorni, crea solo quelli (es. ufficio lun-ven).</p>
+      <button class="btn-primary" id="sp-save">Salva periodo</button>
+      <button class="btn-ghost" id="sp-cancel" style="margin-top:8px;">Annulla</button>
+      <p class="auth-error hidden" id="sp-error"></p>
     </div>
   </div>
 

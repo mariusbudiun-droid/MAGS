@@ -143,36 +143,79 @@ function renderBudget(){
 async function manageBusta(b){
   const c=catById(b.category_id);
   const bal=+b.balance||0;
-  const azione = prompt(`Busta "${c?c.name:'?'}" (${eur(bal)} dentro).\n\nScrivi:\n• un importo da AGGIUNGERE dal conto (es. 100)\n• "-" seguito da importo per TOGLIERE e rimettere nel conto (es. -50)\n• "x" per eliminare la busta e rimettere tutto nel conto`);
-  if(azione===null) return;
+  const nome=c?c.name:'?';
+  const scelta = prompt(
+    `Busta "${nome}" — dentro ci sono ${eur(bal)} (budget ${eur(+b.monthly_limit||0)}).\n\n`+
+    `Scrivi il NUMERO dell'azione:\n`+
+    `1 — Aggiungi soldi dal conto\n`+
+    `2 — Togli soldi e rimettili nel conto\n`+
+    `3 — Reset busta (azzera e reimposta budget)\n`+
+    `4 — Elimina busta`
+  );
+  if(scelta===null) return;
   const corrente=soldi.accounts.find(a=>a.kind==='comune')||soldi.accounts[0];
+  const risparmi=soldi.accounts.find(a=>a.kind==='risparmi');
   const hid=state.household.id;
+  const opt=scelta.trim();
 
   try{
-    if(azione.trim().toLowerCase()==='x'){
-      // elimina busta, soldi tornano al conto
-      if(corrente && bal>0){
+    if(opt==='1'){
+      const amt=parseFloat((prompt('Quanto aggiungere dal conto comune? (€)','0')||'0').replace(',','.'));
+      if(!(amt>0)) return;
+      await sb.from('budgets').update({ balance:bal+amt, monthly_limit:(+b.monthly_limit||0)+amt }).eq('id', b.id);
+      if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)-amt }).eq('id', corrente.id);
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:amt, from_account:corrente.id, to_budget:b.id, description:`Aggiunta busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
+
+    } else if(opt==='2'){
+      const amt=parseFloat((prompt('Quanto togliere e rimettere nel conto? (€)','0')||'0').replace(',','.'));
+      if(!(amt>0)) return;
+      const tolto=Math.min(amt, bal);
+      await sb.from('budgets').update({ balance:bal-tolto }).eq('id', b.id);
+      if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)+tolto }).eq('id', corrente.id);
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:tolto, from_budget:b.id, to_account:corrente.id, description:`Prelievo busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
+
+    } else if(opt==='3'){
+      // RESET: i soldi attuali tornano al conto, poi azzera e reimposta budget
+      const nuovo=parseFloat((prompt(`Reset busta "${nome}".\nNuovo budget mensile? (€)`, String(+b.monthly_limit||0))||'').replace(',','.'));
+      if(isNaN(nuovo)||nuovo<0) return;
+      // rimetti l'eventuale saldo residuo nel conto
+      if(corrente && bal!==0){
         await sb.from('accounts').update({ balance:(+corrente.balance||0)+bal }).eq('id', corrente.id);
-        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:bal, from_budget:b.id, to_account:corrente.id, description:`Chiusura busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:Math.abs(bal), from_budget:b.id, to_account:corrente.id, description:`Reset busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
       }
+      // azzera il saldo e imposta il nuovo budget (NON riempie: lo riempi tu con "Aggiungi")
+      await sb.from('budgets').update({ balance:0, monthly_limit:nuovo }).eq('id', b.id);
+      alert(`Busta "${nome}" azzerata. Budget impostato a ${eur(nuovo)}.\nUsa "Aggiungi soldi" per riempirla.`);
+
+    } else if(opt==='4'){
+      // ELIMINA: chiedi dove vanno i soldi rimasti
+      let dest='3';
+      if(bal>0){
+        dest = prompt(
+          `Eliminare la busta "${nome}" — ci sono ancora ${eur(bal)}.\n\n`+
+          `Dove vanno i soldi rimasti?\n`+
+          `1 — Conto comune\n`+
+          `2 — Risparmi\n`+
+          `3 — Eliminali (spariscono)`
+        );
+        if(dest===null) return;
+        dest=dest.trim();
+      }
+      if(bal>0 && dest==='1' && corrente){
+        await sb.from('accounts').update({ balance:(+corrente.balance||0)+bal }).eq('id', corrente.id);
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:bal, from_budget:b.id, to_account:corrente.id, description:`Chiusura busta ${nome} → conto`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+      } else if(bal>0 && dest==='2' && risparmi){
+        await sb.from('accounts').update({ balance:(+risparmi.balance||0)+bal }).eq('id', risparmi.id);
+        await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:bal, from_budget:b.id, to_account:risparmi.id, description:`Chiusura busta ${nome} → risparmi`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+      }
+      // scollega eventuali liste spesa che usano questa categoria
+      if(c){ await sb.from('shopping_lists').update({ category_id:null }).eq('category_id', c.id); }
       await sb.from('budgets').delete().eq('id', b.id);
-    } else {
-      const val=parseFloat(azione.replace(',','.'));
-      if(isNaN(val)||val===0) return;
-      // val>0: aggiungi dal conto alla busta; val<0: togli dalla busta al conto
-      const amt=Math.abs(val);
-      if(val>0){
-        await sb.from('budgets').update({ balance:bal+amt, monthly_limit:(+b.monthly_limit||0)+amt }).eq('id', b.id);
-        if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)-amt }).eq('id', corrente.id);
-          await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:amt, from_account:corrente.id, to_budget:b.id, description:`Aggiunta busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
-      } else {
-        const tolto=Math.min(amt, bal);
-        await sb.from('budgets').update({ balance:bal-tolto }).eq('id', b.id);
-        if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)+tolto }).eq('id', corrente.id);
-          await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:tolto, from_budget:b.id, to_account:corrente.id, description:`Prelievo busta ${c?c.name:''}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
-      }
-    }
-    await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica();
+      alert(`Busta "${nome}" eliminata.`);
+
+    } else { return; }
+
+    await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica(); renderCategorie();
   }catch(err){ alert('Errore: '+(err.message||err)); }
 }
 
