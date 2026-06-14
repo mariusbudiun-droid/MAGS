@@ -11,8 +11,9 @@ function ymd(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
 function todayYmd(){ const n=new Date(); return ymd(n.getFullYear(), n.getMonth(), n.getDate()); }
 
 async function openCalendar(){
-  if(!state.cal.selDate) state.cal.selDate = todayYmd();
-  if(!state.cal.weekStart) state.cal.weekStart = mondayOf(state.cal.selDate);
+  // torna sempre a oggi quando si apre il calendario
+  state.cal.selDate = todayYmd();
+  state.cal.weekStart = mondayOf(state.cal.selDate);
   if(!state.cal.view) state.cal.view = 'settimana';
   renderCalFilter();
   applyCalView();
