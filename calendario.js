@@ -58,7 +58,7 @@ async function loadMonthEventsCal(){
     sb.from('member_schedules').select('weekday,label,active,member_id,kind,start_date,end_date').in('member_id', memberIds).eq('active', true),
     sb.from('schedule_exceptions').select('*').in('member_id', memberIds),
   ]);
-  state.cal.events = data||[];
+  state.cal.events = data||[]; patternAnchors = {};
   calSchedules = sch||[];
   calExceptions = exc||[];
 }
@@ -111,7 +111,51 @@ function dayChips(evs, max){
 // il turno di lavoro di un membro in un dato giorno (duty_type)
 function dutyOfMemberOn(memberId, dateStr){
   const ev = state.cal.events.find(e=>e.category==='lavoro' && e.member_id===memberId && (e.start_at||'').slice(0,10)===dateStr);
-  return ev ? (ev.duty_type||'duty') : null;
+  if(ev) return ev.duty_type||'duty';
+  // se non c'è un evento reale, prova la proiezione del pattern (se attiva)
+  if(patternEnabled()) return projectedDuty(memberId, dateStr);
+  return null;
+}
+
+// --- PROIEZIONE PATTERN ROSTER (beta) ---
+// ciclo fisso: 5 early, 3 off, 5 late, 3 off = 16 giorni
+const CYCLE = ['early','early','early','early','early','off','off','off','late','late','late','late','late','off','off','off'];
+const CYCLE_LEN = CYCLE.length;
+function patternEnabled(){ return localStorage.getItem('mags_pattern')==='1'; }
+
+// cache dell'ancora per membro: {memberId: {anchorDate, anchorIndex}}
+let patternAnchors = {};
+function computeAnchor(memberId){
+  // prendi tutti gli eventi lavoro reali (con duty early/late/off) del membro, ordinati
+  const evs = state.cal.events
+    .filter(e=>e.category==='lavoro' && e.member_id===memberId && e.source==='roster' && ['early','late','off'].includes(e.duty_type))
+    .map(e=>({ d:(e.start_at||'').slice(0,10), t:e.duty_type }))
+    .sort((a,b)=>a.d<b.d?-1:1);
+  if(!evs.length) return null;
+  // trova un "early" che inizia un blocco (il giorno prima non è early) → posizione 0 del ciclo
+  for(let i=0;i<evs.length;i++){
+    if(evs[i].t==='early'){
+      const prev = evs[i-1];
+      const isBlockStart = !prev || prev.t!=='early' || daysBetween(prev.d, evs[i].d)>1;
+      if(isBlockStart) return { anchorDate: evs[i].d, anchorIndex: 0 };
+    }
+  }
+  // fallback: usa il primo evento e allinea per tipo
+  const first=evs[0];
+  const idx = first.t==='early'?0 : first.t==='late'?8 : 5;
+  return { anchorDate:first.d, anchorIndex:idx };
+}
+function daysBetween(a,b){
+  return Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00'))/86400000);
+}
+function projectedDuty(memberId, dateStr){
+  if(!(memberId in patternAnchors)) patternAnchors[memberId]=computeAnchor(memberId);
+  const anchor = patternAnchors[memberId];
+  if(!anchor) return null;
+  const delta = daysBetween(anchor.anchorDate, dateStr);
+  let pos = (anchor.anchorIndex + delta) % CYCLE_LEN;
+  if(pos<0) pos += CYCLE_LEN;
+  return CYCLE[pos];
 }
 // il mio turno (compatibilità con vista settimana)
 function myDutyOn(dateStr){ return state.me ? dutyOfMemberOn(state.me.id, dateStr) : null; }
@@ -234,7 +278,7 @@ async function loadWeekEvents(){
     .lt('start_at', end+'T00:00:00')
     .order('start_at');
   if(error){ console.error(error); state.cal.events=[]; return; }
-  state.cal.events = data||[];
+  state.cal.events = data||[]; patternAnchors = {};
 }
 
 function eventsForDay(dateStr){

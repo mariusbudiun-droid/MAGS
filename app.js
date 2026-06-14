@@ -574,13 +574,26 @@ function etichettaOcc(o){
   return map[o]||o;
 }
 
+function refreshPatternToggle(){
+  const btn=$('toggle-pattern'); if(!btn) return;
+  const on = localStorage.getItem('mags_pattern')==='1';
+  btn.textContent = 'Proiezione turni: '+(on?'ATTIVA':'spenta');
+  btn.style.color = on ? 'var(--accent)' : '';
+}
+
 // scorciatoie dai blocchi home
 document.addEventListener('click', (e)=>{
   if(e.target.id==='home-goto-cal'){ document.querySelector('#tabbar .tab[data-v="cal"]').click(); }
   if(e.target.id==='home-goto-soldi'){ document.querySelector('#tabbar .tab[data-v="soldi"]').click(); }
-  if(e.target.id==='home-open-settings'){ $('settings-modal').classList.remove('hidden'); }
+  if(e.target.id==='home-open-settings'){ $('settings-modal').classList.remove('hidden'); refreshPatternToggle(); }
   if(e.target.id==='settings-close'){ $('settings-modal').classList.add('hidden'); }
   if(e.target.id==='settings-modal'){ $('settings-modal').classList.add('hidden'); }
+  if(e.target.id==='toggle-pattern'){
+    const on = localStorage.getItem('mags_pattern')==='1';
+    localStorage.setItem('mags_pattern', on?'0':'1');
+    refreshPatternToggle();
+    if(typeof openCalendar==='function' && document.querySelector('#tab-cal.on, .tab[data-v="cal"].on')) openCalendar();
+  }
 });
 
 // ---- navigazione tab principali ----
