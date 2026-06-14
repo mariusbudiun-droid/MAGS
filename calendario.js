@@ -502,34 +502,47 @@ $('roster-file').addEventListener('change', async (e)=>{
   const file = e.target.files[0];
   if(!file) return;
   $('roster-preview').innerHTML='';
-  setRosterStatus('load','Lettura del roster in corso… può richiedere qualche secondo.');
+  // overlay a schermo intero (visibile ovunque tu sia)
+  $('roster-loading-msg').textContent = "Invio dello screenshot all'analisi. Può richiedere qualche secondo.";
+  $('roster-loading').classList.remove('hidden');
 
   try{
     const base64 = await fileToBase64(file);
+    $('roster-loading-msg').textContent = "Analisi in corso… ci siamo quasi.";
     const resp = await fetch('/api/import-roster', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ imageBase64: base64, mediaType: file.type })
     });
     const data = await resp.json();
+    $('roster-loading').classList.add('hidden');
     if(!resp.ok || !data.success){
-      setRosterStatus('err', data.error || 'Import non riuscito. Riprova.');
+      alert(data.error || 'Import non riuscito. Riprova con uno screenshot più nitido.');
       return;
     }
-    // tieni i giorni con un'attività vera: voli, standby, duty, ferie...
-    // scarta solo gli OFF (riposi) che non sono impegni
-    rosterDays = (data.days||[]).filter(d=> d.type); // includi anche OFF (per colorare i riposi)
+    rosterDays = (data.days||[]).filter(d=> d.type);
     if(rosterDays.length===0){
-      setRosterStatus('err','Nessun impegno trovato nello screenshot.');
+      alert('Nessun impegno trovato nello screenshot.');
       return;
     }
+    // porta l'utente alla sezione roster per vedere e confermare la preview
+    showRosterSection();
     clearRosterStatus();
     renderRosterPreview();
   }catch(err){
-    setRosterStatus('err','Errore: '+(err.message||err));
+    $('roster-loading').classList.add('hidden');
+    alert('Errore durante l\'import: '+(err.message||err));
   }
-  e.target.value=''; // reset così puoi ricaricare lo stesso file
+  e.target.value='';
 });
+
+// mostra la sezione roster (cal-voli) e attiva la pillola
+function showRosterSection(){
+  document.querySelectorAll('#cal-subnav .s').forEach(x=>x.classList.remove('on'));
+  ['cal-agenda','cal-voli','cal-scuola'].forEach(id=>{ const el=$(id); if(el) el.classList.remove('on'); });
+  const voli=$('cal-voli'); if(voli) voli.classList.add('on');
+  const fab=$('fab-event'); if(fab) fab.classList.add('hidden');
+}
 
 function fileToBase64(file){
   return new Promise((res,rej)=>{
