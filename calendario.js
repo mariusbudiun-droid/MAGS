@@ -913,7 +913,7 @@ $('sp-save').addEventListener('click', async ()=>{
       start_at: atWork && stime ? `${ds}T${stime}:00` : `${ds}T00:00:00`,
       end_at: atWork && etime ? `${ds}T${etime}:00` : null,
       all_day: !atWork,
-      source: 'manual',
+      source: 'manuale',
       created_by: state.me ? state.me.id : null,
     });
   }
@@ -922,7 +922,7 @@ $('sp-save').addEventListener('click', async ()=>{
   for(const r of rows){
     const ds=r.start_at.slice(0,10);
     await sb.from('events').delete()
-      .eq('household_id', state.household.id).eq('member_id', memberId).eq('source','manual')
+      .eq('household_id', state.household.id).eq('member_id', memberId).eq('source','manuale')
       .gte('start_at', ds+'T00:00:00').lt('start_at', ds+'T23:59:59');
   }
   const { error } = await sb.from('events').insert(rows);

@@ -210,7 +210,12 @@ async function manageBusta(b){
       }
       // scollega eventuali liste spesa che usano questa categoria
       if(c){ await sb.from('shopping_lists').update({ category_id:null }).eq('category_id', c.id); }
-      await sb.from('budgets').delete().eq('id', b.id);
+      // scollega le transazioni che referenziano questa busta (altrimenti la FK blocca la delete)
+      await sb.from('transactions').update({ from_budget:null }).eq('from_budget', b.id);
+      await sb.from('transactions').update({ to_budget:null }).eq('to_budget', b.id);
+      // ora elimina la busta e verifica l'esito
+      const { error: delErr } = await sb.from('budgets').delete().eq('id', b.id);
+      if(delErr){ alert('Non riesco a eliminare la busta: '+delErr.message); return; }
       alert(`Busta "${nome}" eliminata.`);
 
     } else { return; }

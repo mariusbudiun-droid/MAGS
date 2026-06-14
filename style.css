@@ -387,6 +387,9 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 @keyframes slideup{from{transform:translateY(40px);opacity:.6;}to{transform:none;opacity:1;}}
 .modal-title{font-family:var(--display);font-size:20px;font-weight:800;margin-bottom:6px;}
 .row2{display:flex;gap:9px;}
+.row2 > *{flex:1 1 0;min-width:0;}
+.row2 .field, .modal-card .field{max-width:100%;box-sizing:border-box;}
+.modal-card input[type="date"], .modal-card input[type="time"]{max-width:100%;box-sizing:border-box;}
 
 /* ---------- liste spesa ---------- */
 .listpills{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px;}
