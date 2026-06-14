@@ -497,7 +497,27 @@ $('ev-save').addEventListener('click', async ()=>{
 
 $('ev-delete').addEventListener('click', async ()=>{
   if(!editingEventId) return;
-  const { error } = await sb.from('events').delete().eq('id', editingEventId);
+  // trova l'evento corrente per capire se fa parte di una serie (stesso titolo+membro+source manuale)
+  const ev = state.cal.events.find(e=>e.id===editingEventId);
+  let scope='one';
+  if(ev && ev.source==='manuale' && ev.member_id && ev.title){
+    // conta quanti altri eventi della stessa serie esistono
+    const serie = state.cal.events.filter(e=>e.source==='manuale' && e.member_id===ev.member_id && e.title===ev.title);
+    if(serie.length>1){
+      const r = confirm(`"${ev.title}" è un periodo su ${serie.length} giorni.\n\nOK = elimina TUTTO il periodo\nAnnulla = elimina solo questo giorno`);
+      scope = r ? 'all' : 'one';
+    }
+  }
+  let error;
+  if(scope==='all'){
+    ({ error } = await sb.from('events').delete()
+      .eq('household_id', state.household.id)
+      .eq('member_id', ev.member_id)
+      .eq('title', ev.title)
+      .eq('source','manuale'));
+  } else {
+    ({ error } = await sb.from('events').delete().eq('id', editingEventId));
+  }
   if(error){ showError('ev-error','Errore: '+error.message); return; }
   closeEventModal();
   await applyCalView();
@@ -939,6 +959,8 @@ $('sp-cancel').addEventListener('click', ()=>$('special-modal').classList.add('h
 $('special-modal').addEventListener('click', e=>{ if(e.target.id==='special-modal') $('special-modal').classList.add('hidden'); });
 
 $('sp-save').addEventListener('click', async ()=>{
+  const btn=$('sp-save');
+  if(btn.dataset.busy==='1') return;  // evita doppio tap
   clearError('sp-error');
   const memberId=$('sp-member').value;
   const type=$('sp-type').value;
@@ -947,6 +969,7 @@ $('sp-save').addEventListener('click', async ()=>{
   if(!memberId){ showError('sp-error','Scegli chi.'); return; }
   if(!from||!to){ showError('sp-error','Imposta le date dal/al.'); return; }
   if(to<from){ showError('sp-error','La data finale è prima dell\'inizio.'); return; }
+  btn.dataset.busy='1'; btn.textContent='Salvataggio…';
   const atWork = (type==='early'||type==='late');
   // duty_type per il riquadro: a casa→off/ferie/congedo (verde), ufficio→early/late
   const dutyMap={ off:'off', ferie:'ferie', congedo:'off', early:'early', late:'late' };
@@ -976,7 +999,7 @@ $('sp-save').addEventListener('click', async ()=>{
       created_by: state.me ? state.me.id : null,
     });
   }
-  if(!rows.length){ showError('sp-error','Nessun giorno nell\'intervallo.'); return; }
+  if(!rows.length){ showError('sp-error','Nessun giorno nell\'intervallo.'); btn.dataset.busy='0'; btn.textContent='Salva periodo'; return; }
   // evita doppioni manuali nelle stesse date per quel membro
   for(const r of rows){
     const ds=r.start_at.slice(0,10);
@@ -985,6 +1008,7 @@ $('sp-save').addEventListener('click', async ()=>{
       .gte('start_at', ds+'T00:00:00').lt('start_at', ds+'T23:59:59');
   }
   const { error } = await sb.from('events').insert(rows);
+  btn.dataset.busy='0'; btn.textContent='Salva periodo';
   if(error){ showError('sp-error','Errore: '+error.message); return; }
   $('special-modal').classList.add('hidden');
   openCalendar();

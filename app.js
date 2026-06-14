@@ -536,7 +536,7 @@ async function loadHomeExtras(){
     aw.innerHTML='';
     if(!evs || evs.length===0){ aw.innerHTML='<div class="ev-empty">Nessun impegno in programma.</div>'; }
     else evs.forEach(e=>{
-      const t = e.all_day ? 'tutto il g.' : (e.start_at||'').slice(11,16);
+      const t = e.all_day ? 'giorno' : (e.start_at||'').slice(11,16);
       const mem = state.members.find(m=>m.id===e.member_id);
       const col = CAT_COLORS[e.category]||'var(--ink-soft)';
       const row=document.createElement('div'); row.className='ev';

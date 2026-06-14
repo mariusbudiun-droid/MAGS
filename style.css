@@ -378,7 +378,7 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 
 .ev{display:flex;gap:13px;align-items:flex-start;padding:13px 2px;border-bottom:1px solid var(--line-soft);cursor:pointer;}
 .ev:last-child{border-bottom:none;}
-.ev .time{font-weight:700;font-size:13px;min-width:50px;padding-top:1px;font-family:var(--mono);color:var(--accent);}
+.ev .time{font-weight:700;font-size:13px;width:64px;min-width:64px;max-width:64px;padding-top:1px;font-family:var(--mono);color:var(--accent);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ev .dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:none;}
 .ev .ti{font-weight:700;font-size:14.5px;}
 .ev .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
@@ -398,6 +398,9 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .row2 > *{flex:1 1 0;min-width:0;width:100%;}
 .row2 .field, .modal-card .field{max-width:100%;box-sizing:border-box;}
 .modal-card input[type="date"], .modal-card input[type="time"]{max-width:100%;width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;}
+/* input data/ora: mai più larghi del contenitore, ovunque siano */
+input[type="date"], input[type="time"]{max-width:100%;width:100%;min-width:0;box-sizing:border-box;-webkit-appearance:none;appearance:none;}
+.hero-card .field, .hero-card input{max-width:100%;box-sizing:border-box;}
 
 /* ---------- liste spesa ---------- */
 .listpills{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px;}
