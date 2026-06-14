@@ -579,7 +579,16 @@ function refreshPatternToggle(){
   const on = localStorage.getItem('mags_pattern')==='1';
   btn.textContent = 'Proiezione turni: '+(on?'ATTIVA':'spenta');
   btn.style.color = on ? 'var(--accent)' : '';
+  const inp=$('pattern-anchor'); if(inp) inp.value = localStorage.getItem('mags_pattern_anchor')||'';
 }
+// salva la data ancora e ridisegna
+document.addEventListener('change', (e)=>{
+  if(e.target && e.target.id==='pattern-anchor'){
+    if(e.target.value) localStorage.setItem('mags_pattern_anchor', e.target.value);
+    else localStorage.removeItem('mags_pattern_anchor');
+    if(typeof openCalendar==='function') openCalendar();
+  }
+});
 
 // scorciatoie dai blocchi home
 document.addEventListener('click', (e)=>{
@@ -592,7 +601,7 @@ document.addEventListener('click', (e)=>{
     const on = localStorage.getItem('mags_pattern')==='1';
     localStorage.setItem('mags_pattern', on?'0':'1');
     refreshPatternToggle();
-    if(typeof openCalendar==='function' && document.querySelector('#tab-cal.on, .tab[data-v="cal"].on')) openCalendar();
+    if(typeof openCalendar==='function') openCalendar();
   }
 });
 
