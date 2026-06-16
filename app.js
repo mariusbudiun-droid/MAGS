@@ -542,7 +542,6 @@ async function loadHomeExtras(){
     aw.innerHTML='';
     if(!evs || evs.length===0){ aw.innerHTML='<div class="ev-empty">Nessun impegno in programma.</div>'; }
     else evs.forEach(e=>{
-      const t = e.all_day ? 'all-day' : (e.start_at||'').slice(11,16);
       // nome partecipanti: lista se gruppo, singolo altrimenti
       const mids = (Array.isArray(e.member_ids)&&e.member_ids.length) ? e.member_ids : (e.member_id?[e.member_id]:[]);
       let memName='';
@@ -553,9 +552,19 @@ async function loadHomeExtras(){
       } else if(mids.length===1){
         const m=state.members.find(x=>x.id===mids[0]); memName=m?m.display_name:'';
       }
+      // orario inizio + fine (per voli la fine è il CO nella nota)
+      let co='';
+      if(e.note){ const mm=e.note.match(/CO:\s*([0-9:—]+)/); if(mm) co=mm[1]; }
+      let timeHtml;
+      if(e.all_day){ timeHtml=`<span class="t1">all-day</span>`; }
+      else {
+        const startT=(e.start_at||'').slice(11,16);
+        let endT=(co&&co!=='—')?co:((e.end_at||'').slice(11,16));
+        timeHtml = startT ? `<span class="t1">${startT}</span>${endT?`<span class="t2">${endT}</span>`:''}` : '';
+      }
       const col = CAT_COLORS[e.category]||'var(--ink-soft)';
       const row=document.createElement('div'); row.className='ev';
-      row.innerHTML=`<span class="time">${t}</span><span class="dot" style="background:${col}"></span>
+      row.innerHTML=`<span class="time time-range">${timeHtml}</span><span class="dot" style="background:${col}"></span>
         <div><div class="ti">${e.title}</div><div class="meta">${[memName,e.location].filter(Boolean).join(' · ')}</div></div>`;
       aw.appendChild(row);
     });

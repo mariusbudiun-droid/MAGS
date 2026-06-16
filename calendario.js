@@ -391,11 +391,9 @@ function renderDayAgenda(){
   const evs = eventsForDay(sel);
   if(evs.length===0){ wrap.innerHTML='<div class="ev-empty">Nessun evento. Tocca + per aggiungerne uno.</div>'; return; }
   evs.forEach(e=>{
-    const t = e.all_day ? 'all-day' : (e.start_at||'').slice(11,16);
     const mids = eventMembers(e);
     let memName='';
     if(mids.length>=2){
-      const allKids = state.members.filter(m=>isChild(m)).map(m=>m.id);
       const allIds = state.members.map(m=>m.id);
       const isAll = allIds.length && allIds.every(id=>mids.includes(id));
       memName = isAll ? 'Tutta la famiglia' : mids.map(id=>{ const m=state.members.find(x=>x.id===id); return m?m.display_name:''; }).filter(Boolean).join(', ');
@@ -403,13 +401,26 @@ function renderDayAgenda(){
       const m=state.members.find(x=>x.id===mids[0]); memName=m?m.display_name:'';
     }
     // estrai CI/CO dalla nota (voli da roster)
-    let cico = '';
+    let ci='', co='';
     if(e.note){
       const m = e.note.match(/CI:\s*([0-9:—]+)\s+CO:\s*([0-9:—]+)/);
-      if(m) cico = `CI ${m[1]} · CO ${m[2]}`;
+      if(m){ ci=m[1]; co=m[2]; }
     }
+    // colonna orario: inizio (sopra) e fine (sotto)
+    let timeHtml;
+    if(e.all_day){
+      timeHtml = `<span class="t1">all-day</span>`;
+    } else {
+      const startT = (e.start_at||'').slice(11,16);
+      // fine: orario CO del volo, oppure end_at dell'evento
+      let endT = (co && co!=='—') ? co : ((e.end_at||'').slice(11,16));
+      timeHtml = startT
+        ? `<span class="t1">${startT}</span>${endT?`<span class="t2">${endT}</span>`:''}`
+        : '';
+    }
+    const cico = (ci||co) ? `CI ${ci||'—'} · CO ${co||'—'}` : '';
     const row=document.createElement('div'); row.className='ev';
-    row.innerHTML = `<span class="time">${t}</span>
+    row.innerHTML = `<span class="time time-range">${timeHtml}</span>
       <span class="dot" style="background:${CAT_COLORS[e.category]||'var(--ink-soft)'}"></span>
       <div><div class="ti">${e.title}</div>
       <div class="meta">${[memName, CAT_LABELS[e.category], e.location].filter(Boolean).join(' · ')}</div>
