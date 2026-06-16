@@ -526,22 +526,37 @@ async function loadHomeExtras(){
     if(r.birth_date) homeBirth[r.member_id]=r.birth_date;
   });
   renderHomeMembersOnly();
-  // prossimi eventi (da oggi in avanti, max 3)
+  // prossimi eventi: include anche i multi-giorno ancora in corso (iniziati prima, non finiti)
   const today = new Date().toISOString().slice(0,10);
-  const { data: evs } = await sb.from('events')
+  const wide = (()=>{ const d=new Date(); d.setDate(d.getDate()-60); return d.toISOString().slice(0,10); })();
+  const { data: evsRaw } = await sb.from('events')
     .select('*').eq('household_id', state.household.id)
-    .gte('start_at', today+'T00:00:00').order('start_at').limit(3);
+    .gte('start_at', wide+'T00:00:00').order('start_at');
+  // tieni quelli che non sono ancora finiti (oggi <= fine), poi i primi 3
+  const evs = (evsRaw||[]).filter(e=>{
+    const d1=(e.end_at||'').slice(0,10) || (e.start_at||'').slice(0,10);
+    return d1>=today;
+  }).slice(0,3);
   const aw=$('home-agenda');
   if(aw){
     aw.innerHTML='';
     if(!evs || evs.length===0){ aw.innerHTML='<div class="ev-empty">Nessun impegno in programma.</div>'; }
     else evs.forEach(e=>{
       const t = e.all_day ? 'all-day' : (e.start_at||'').slice(11,16);
-      const mem = state.members.find(m=>m.id===e.member_id);
+      // nome partecipanti: lista se gruppo, singolo altrimenti
+      const mids = (Array.isArray(e.member_ids)&&e.member_ids.length) ? e.member_ids : (e.member_id?[e.member_id]:[]);
+      let memName='';
+      if(mids.length>=2){
+        const allIds=state.members.map(m=>m.id);
+        const isAll = allIds.length && allIds.every(id=>mids.includes(id));
+        memName = isAll ? 'Tutta la famiglia' : mids.map(id=>{const m=state.members.find(x=>x.id===id);return m?m.display_name:'';}).filter(Boolean).join(', ');
+      } else if(mids.length===1){
+        const m=state.members.find(x=>x.id===mids[0]); memName=m?m.display_name:'';
+      }
       const col = CAT_COLORS[e.category]||'var(--ink-soft)';
       const row=document.createElement('div'); row.className='ev';
       row.innerHTML=`<span class="time">${t}</span><span class="dot" style="background:${col}"></span>
-        <div><div class="ti">${e.title}</div><div class="meta">${[mem?mem.display_name:'',e.location].filter(Boolean).join(' · ')}</div></div>`;
+        <div><div class="ti">${e.title}</div><div class="meta">${[memName,e.location].filter(Boolean).join(' · ')}</div></div>`;
       aw.appendChild(row);
     });
   }
