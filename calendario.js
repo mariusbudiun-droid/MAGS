@@ -52,14 +52,21 @@ async function loadMonthEventsCal(){
   const start = `${y}-${pad(mo+1)}-01`;
   const endDate = new Date(y, mo+1, 1);
   const end = `${endDate.getFullYear()}-${pad(endDate.getMonth()+1)}-01`;
+  const wide = addDays(start, -60);
   const memberIds = state.members.map(m=>m.id);
   const [{ data }, { data: sch }, { data: exc }] = await Promise.all([
     sb.from('events').select('*').eq('household_id', state.household.id)
-      .gte('start_at', start+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at'),
+      .gte('start_at', wide+'T00:00:00').lt('start_at', end+'T00:00:00').order('start_at'),
     sb.from('member_schedules').select('weekday,label,active,member_id,kind,start_date,end_date').in('member_id', memberIds).eq('active', true),
     sb.from('schedule_exceptions').select('*').in('member_id', memberIds),
   ]);
-  state.cal.events = data||[]; patternAnchors = {};
+  // tieni solo eventi che toccano il mese [start, end)
+  state.cal.events = (data||[]).filter(e=>{
+    const d0=(e.start_at||'').slice(0,10);
+    const d1=(e.end_at||'').slice(0,10) || d0;
+    return d0 < end && d1 >= start;
+  });
+  patternAnchors = {};
   calSchedules = sch||[];
   calExceptions = exc||[];
 }
@@ -96,13 +103,43 @@ const DUTY_BAR = {
   off:          '#78d296',
 };
 // pallini SOLO per eventi non-lavoro (appuntamenti, visite, famiglia)
+// lista dei membri di un evento (member_ids se c'è, altrimenti member_id singolo)
+function eventMembers(e){
+  if(Array.isArray(e.member_ids) && e.member_ids.length) return e.member_ids;
+  if(e.member_id) return [e.member_id];
+  return [];
+}
+// simbolo famiglia in base a quanti genitori/figli partecipano
+function familySymbol(memberIds){
+  const mem = memberIds.map(id=>state.members.find(m=>m.id===id)).filter(Boolean);
+  const adults = mem.filter(m=>!isChild(m)).length;
+  const kids = mem.filter(m=>isChild(m)).length;
+  if(adults>=2 && kids>=2) return '🧑‍🧑‍🧒‍🧒';
+  if(adults>=2 && kids===1) return '🧑‍🧑‍🧒';
+  if(adults===1 && kids>=2) return '🧑‍🧒‍🧒';
+  if(adults===1 && kids===1) return '🧑‍🧒';
+  return null;
+}
+function isChild(m){
+  // bambino o neonato = figlio; altrimenti adulto
+  if(!m) return false;
+  if(m.member_type==='bambino' || m.member_type==='neonato' || m.is_expected) return true;
+  return false;
+}
 function dayChips(evs, max){
   const puntuali = evs.filter(e=>e.category!=='lavoro');
   const chips = puntuali.map(e=>{
-    let ini;
-    if(e.category==='famiglia' && !e.member_id) ini='♡';
-    else ini = e.member_id ? memberInitial(e.member_id) : '·';
+    const mids = eventMembers(e);
     const col = CAT_COLORS[e.category]||'var(--ink-soft)';
+    // evento di gruppo (più membri) → simbolo famiglia
+    if(mids.length>=2){
+      const sym = familySymbol(mids);
+      if(sym) return `<span class="daychip famsym" style="background:${col}">${sym}</span>`;
+      return `<span class="daychip" style="background:${col}">${mids.length}</span>`;
+    }
+    let ini;
+    if(e.category==='famiglia' && !mids.length) ini='♡';
+    else ini = mids.length ? memberInitial(mids[0]) : '·';
     return `<span class="daychip" style="background:${col}">${ini}</span>`;
   });
   if(chips.length<=max) return chips.join('');
@@ -274,14 +311,22 @@ function renderCalFilter(){
 async function loadWeekEvents(){
   const start = state.cal.weekStart;
   const end = addDays(start, 7);
+  // allarga indietro di 60 giorni per catturare eventi multi-giorno iniziati prima
+  const wide = addDays(start, -60);
   const { data, error } = await sb.from('events')
     .select('*')
     .eq('household_id', state.household.id)
-    .gte('start_at', start+'T00:00:00')
+    .gte('start_at', wide+'T00:00:00')
     .lt('start_at', end+'T00:00:00')
     .order('start_at');
   if(error){ console.error(error); state.cal.events=[]; return; }
-  state.cal.events = data||[]; patternAnchors = {};
+  // tieni solo eventi che toccano la settimana [start, end)
+  state.cal.events = (data||[]).filter(e=>{
+    const d0=(e.start_at||'').slice(0,10);
+    const d1=(e.end_at||'').slice(0,10) || d0;
+    return d0 < end && d1 >= start;
+  });
+  patternAnchors = {};
 }
 
 function eventsForDay(dateStr){
@@ -291,7 +336,10 @@ function eventsForDay(dateStr){
     // evento multi-giorno: copre l'intervallo [d0, d1]
     const inRange = d1 && d1>d0 ? (dateStr>=d0 && dateStr<=d1) : (d0===dateStr);
     if(!inRange) return false;
-    if(state.cal.filterMember!=='all' && e.member_id!==state.cal.filterMember) return false;
+    if(state.cal.filterMember!=='all'){
+      const mids = eventMembers(e);
+      if(!mids.includes(state.cal.filterMember)) return false;
+    }
     return true;
   }).sort((a,b)=> (a.start_at||'').localeCompare(b.start_at||''));
 }
@@ -344,8 +392,16 @@ function renderDayAgenda(){
   if(evs.length===0){ wrap.innerHTML='<div class="ev-empty">Nessun evento. Tocca + per aggiungerne uno.</div>'; return; }
   evs.forEach(e=>{
     const t = e.all_day ? 'all-day' : (e.start_at||'').slice(11,16);
-    const mem = state.members.find(m=>m.id===e.member_id);
-    const memName = mem ? mem.display_name : '';
+    const mids = eventMembers(e);
+    let memName='';
+    if(mids.length>=2){
+      const allKids = state.members.filter(m=>isChild(m)).map(m=>m.id);
+      const allIds = state.members.map(m=>m.id);
+      const isAll = allIds.length && allIds.every(id=>mids.includes(id));
+      memName = isAll ? 'Tutta la famiglia' : mids.map(id=>{ const m=state.members.find(x=>x.id===id); return m?m.display_name:''; }).filter(Boolean).join(', ');
+    } else if(mids.length===1){
+      const m=state.members.find(x=>x.id===mids[0]); memName=m?m.display_name:'';
+    }
     // estrai CI/CO dalla nota (voli da roster)
     let cico = '';
     if(e.note){
@@ -410,11 +466,12 @@ function openEventModal(ev){
   $('event-modal-title').textContent = ev ? 'Modifica evento' : 'Nuovo evento';
   // chip membri (selezione multipla)
   const mp=$('ev-members'); mp.innerHTML='';
+  const preselected = ev ? eventMembers(ev) : [];
   state.members.forEach(m=>{
     const initial=(m.display_name||'?').charAt(0).toUpperCase();
     const chip=document.createElement('span'); chip.className='mp'; chip.dataset.id=m.id;
     chip.innerHTML=`<span class="av" style="background:${m.color}">${initial}</span>${m.display_name}`;
-    if(ev && ev.member_id===m.id) chip.classList.add('on');
+    if(preselected.includes(m.id)) chip.classList.add('on');
     chip.onclick=()=>chip.classList.toggle('on');
     mp.appendChild(chip);
   });
@@ -477,8 +534,8 @@ $('ev-save').addEventListener('click', async ()=>{
   // membri selezionati (chip)
   const selected = [...document.querySelectorAll('#ev-members .mp.on')].map(c=>c.dataset.id);
   const category = $('ev-category').value;
-  // categoria "famiglia" = riguarda tutti, nessun membro specifico
-  const memberIds = category==='famiglia' ? [null] : (selected.length ? selected : [null]);
+  // categoria "famiglia" = tutti; altrimenti i selezionati
+  const memberIds = category==='famiglia' ? state.members.map(m=>m.id) : selected;
 
   const base = {
     household_id: state.household.id,
@@ -488,17 +545,17 @@ $('ev-save').addEventListener('click', async ()=>{
     location: $('ev-location').value.trim() || null,
     note: $('ev-note').value.trim() || null,
     created_by: state.me ? state.me.id : null,
+    // member_id singolo = primo della lista (compatibilità), member_ids = lista completa
+    member_id: memberIds.length===1 ? memberIds[0] : null,
+    member_ids: memberIds.length ? memberIds : null,
   };
 
   const btn=$('ev-save'); btn.disabled=true; btn.textContent='Salvataggio…';
   let error;
   if(editingEventId){
-    // in modifica aggiorno il singolo evento col primo membro selezionato
-    ({ error } = await sb.from('events').update({ ...base, member_id: memberIds[0]||null }).eq('id', editingEventId));
+    ({ error } = await sb.from('events').update(base).eq('id', editingEventId));
   } else {
-    // creo un evento per ogni membro selezionato
-    const rows = memberIds.map(mid=>({ ...base, member_id: mid }));
-    ({ error } = await sb.from('events').insert(rows));
+    ({ error } = await sb.from('events').insert(base));
   }
   btn.disabled=false; btn.textContent='Salva evento';
   if(error){ showError('ev-error','Errore: '+error.message); return; }
@@ -791,14 +848,20 @@ async function saveRoster(){
     else if(d.type==='al'){ duty_type='ferie'; }
     else if(d.type==='off'){ duty_type='off'; }
     else { duty_type=d.type||'duty'; }
+    // per i voli: inizio = check-in (CI), fine = check-out (CO)
+    let sTime = t.start, eTime = t.end;
+    if(d.type==='flight'){
+      if(cio.ci) sTime = cio.ci;
+      if(cio.co) eTime = cio.co;
+    }
     return {
       household_id: state.household.id,
       member_id: state.me ? state.me.id : null,
       title: d.type==='off' ? 'Riposo' : desc,
       category: 'lavoro',
       duty_type,
-      start_at: allDay ? `${d.date}T00:00:00` : `${d.date}T${t.start}:00`,
-      end_at: (!allDay && t.end) ? `${d.date}T${t.end}:00` : null,
+      start_at: allDay ? `${d.date}T00:00:00` : `${d.date}T${sTime}:00`,
+      end_at: (!allDay && eTime) ? `${d.date}T${eTime}:00` : null,
       all_day: allDay,
       location: d.type==='flight' ? 'PSR' : null,
       note,
