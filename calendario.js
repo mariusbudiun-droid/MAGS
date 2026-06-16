@@ -854,6 +854,11 @@ async function saveRoster(){
       if(cio.ci) sTime = cio.ci;
       if(cio.co) eTime = cio.co;
     }
+    // il volo resta sempre sul giorno di partenza (anche se il CO è dopo mezzanotte):
+    // se il CO è "prima" del CI non lo usiamo come end_at (creerebbe un orario impossibile),
+    // l'orario CO resta comunque visibile nella nota (CI · CO)
+    let endSameDay = eTime;
+    if(d.type==='flight' && sTime && eTime && eTime < sTime){ endSameDay = null; }
     return {
       household_id: state.household.id,
       member_id: state.me ? state.me.id : null,
@@ -861,7 +866,7 @@ async function saveRoster(){
       category: 'lavoro',
       duty_type,
       start_at: allDay ? `${d.date}T00:00:00` : `${d.date}T${sTime}:00`,
-      end_at: (!allDay && eTime) ? `${d.date}T${eTime}:00` : null,
+      end_at: (!allDay && endSameDay) ? `${d.date}T${endSameDay}:00` : null,
       all_day: allDay,
       location: d.type==='flight' ? 'PSR' : null,
       note,
