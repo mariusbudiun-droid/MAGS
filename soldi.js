@@ -323,7 +323,7 @@ async function payBill(b){
   // fonti: conti + buste
   const sources = [];
   soldi.accounts.forEach(a=> sources.push({ kind:'acc', id:a.id, label:`${a.icon||'🏦'} ${a.name} (${eur(+a.balance||0)})` }));
-  soldi.budgets.forEach(bu=> sources.push({ kind:'bud', id:bu.id, label:`✉️ ${bu.name} (${eur(+bu.balance||0)})` }));
+  soldi.budgets.forEach(bu=>{ const c=catById(bu.category_id); sources.push({ kind:'bud', id:bu.id, label:`✉️ ${c?c.name:'Busta'} (${eur(+bu.balance||0)})` }); });
   if(!sources.length){ alert('Nessun conto disponibile.'); return; }
   const menu = sources.map((s,i)=>`${i+1}. ${s.label}`).join('\n');
   const pick = prompt(`Pagare "${b.name}" — ${eur(amount)}\nDa dove prendo i soldi?\n\n${menu}\n\nScrivi il numero:`, '1');
@@ -341,11 +341,11 @@ async function settleBill(b, amount, src){
   const today = new Date().toISOString().slice(0,10);
   if(src.kind==='acc'){
     const acc = soldi.accounts.find(a=>a.id===src.id);
-    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
+    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
     await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
   } else {
     const bud = soldi.budgets.find(x=>x.id===src.id);
-    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
+    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
     await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
   }
   // avanza la scadenza secondo la frequenza (0 = una tantum → disattiva)
@@ -588,6 +588,9 @@ function openBillModal(b){
   $('bill-variable').checked = b ? !!b.variable_amount : false;
   $('bill-freq').value = b && b.freq_months!=null ? String(b.freq_months) : '1';
   $('bill-paytype').value = b && b.auto_debit ? 'auto' : 'manuale';
+  $('bill-cat').innerHTML = '<option value="">— Senza categoria —</option>' +
+    soldi.categories.map(c=>`<option value="${c.id}">${c.icon||''} ${c.name}</option>`).join('');
+  $('bill-cat').value = (b && b.category_id) ? b.category_id : '';
   $('bill-delete').style.display=b?'block':'none';
   clearError('bill-error'); $('bill-modal').classList.remove('hidden');
 }
@@ -602,6 +605,7 @@ $('bill-save').addEventListener('click', async ()=>{
   const payload={ household_id:state.household.id, name, amount,
     freq_months: parseInt($('bill-freq').value,10),
     variable_amount: variable,
+    category_id: $('bill-cat').value || null,
     auto_debit: $('bill-paytype').value==='auto',
     next_due:$('bill-due').value, active:true };
   let error;
