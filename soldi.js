@@ -233,11 +233,59 @@ function renderBollette(){
     const m=d.toLocaleDateString('it-IT',{month:'short'}); const day=d.getDate();
     const row=document.createElement('div'); row.className='bill';
     row.innerHTML=`<div class="bd"><div class="m">${m}</div><div class="d">${day}</div></div>
-      <div><div class="bn">${b.name}</div><div class="bm">in scadenza${b.auto_debit?' · domiciliato':''}</div></div>
-      <div class="ba">${b.amount?eur(b.amount):'—'}</div>`;
-    row.onclick=()=>openBillModal(b);
+      <div class="bill-mid"><div class="bn">${b.name}</div><div class="bm">in scadenza${b.auto_debit?' · domiciliato':''}</div></div>
+      <div class="bill-right"><div class="ba">${b.amount?eur(b.amount):'—'}</div>
+      <button class="bill-pay" data-id="${b.id}">Pagato</button></div>`;
+    row.querySelector('.bill-mid').onclick=()=>openBillModal(b);
+    row.querySelector('.bd').onclick=()=>openBillModal(b);
+    row.querySelector('.bill-pay').onclick=(e)=>{ e.stopPropagation(); payBill(b); };
     wrap.appendChild(row);
   });
+}
+
+// segna una scadenza come pagata: scala da conto/busta, crea movimento, sposta al mese dopo
+async function payBill(b){
+  const hid=state.household.id;
+  // importo: usa quello salvato o chiedi
+  let amount = +b.amount || 0;
+  if(!amount){
+    const raw = prompt(`Quanto hai pagato per "${b.name}"? (€)`, '');
+    if(raw===null) return;
+    amount = parseFloat((raw||'').replace(',','.'));
+    if(isNaN(amount) || amount<=0){ alert('Importo non valido.'); return; }
+  }
+  // costruisci l'elenco delle fonti: conti + buste
+  const sources = [];
+  soldi.accounts.forEach(a=> sources.push({ kind:'acc', id:a.id, label:`${a.icon||'🏦'} ${a.name} (${eur(+a.balance||0)})` }));
+  soldi.budgets.forEach(bu=> sources.push({ kind:'bud', id:bu.id, label:`✉️ ${bu.name} (${eur(+bu.balance||0)})` }));
+  if(!sources.length){ alert('Nessun conto disponibile.'); return; }
+  const menu = sources.map((s,i)=>`${i+1}. ${s.label}`).join('\n');
+  const pick = prompt(`Pagare "${b.name}" — ${eur(amount)}\nDa dove prendo i soldi?\n\n${menu}\n\nScrivi il numero:`, '1');
+  if(pick===null) return;
+  const idx = parseInt(pick,10)-1;
+  if(isNaN(idx) || idx<0 || idx>=sources.length){ alert('Scelta non valida.'); return; }
+  const src = sources[idx];
+  const today = new Date().toISOString().slice(0,10);
+
+  // crea il movimento di uscita e aggiorna il saldo
+  if(src.kind==='acc'){
+    const acc = soldi.accounts.find(a=>a.id===src.id);
+    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
+    await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
+  } else {
+    const bud = soldi.budgets.find(x=>x.id===src.id);
+    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
+    await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
+  }
+
+  // sposta la scadenza al mese successivo
+  if(b.next_due){
+    const nd=new Date(b.next_due+'T12:00:00'); nd.setMonth(nd.getMonth()+1);
+    await sb.from('recurring_bills').update({ next_due: nd.toISOString().slice(0,10) }).eq('id', b.id);
+  }
+  await loadSoldiAll();
+  renderBollette(); renderConti(); reloadBalances && reloadBalances();
+  alert(`✓ ${b.name} pagato — ${eur(amount)} scalati da ${src.label.replace(/\s*\(.*\)/,'')}.`);
 }
 
 // ---------- OBIETTIVI ----------
