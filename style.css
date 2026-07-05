@@ -358,6 +358,16 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-card .hero-card-head > div div[style*="color"]{color:rgba(0,0,0,.6)!important;}
 .hero-card .hc-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(0,0,0,.6);}
 .hero-card .hc-value{color:#1a1014;}
+.hero-card .hc-total{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.35);}
+.hero-card .meal-row{display:flex;align-items:center;gap:10px;padding:7px 0;}
+.hero-card .meal-row+.meal-row{border-top:1px solid rgba(255,255,255,.3);}
+.hero-card .meal-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:rgba(0,0,0,.55);width:64px;flex:none;}
+.hero-card .meal-dish{color:#1a1014;font-weight:600;font-size:14px;}
+.hero-card .meal-dish.empty{color:rgba(0,0,0,.4);font-weight:500;font-style:italic;}
+.hero-card .bill-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0;}
+.hero-card .bill-row+.bill-row{border-top:1px solid rgba(255,255,255,.3);}
+.hero-card .bill-row-due{font-size:12px;color:rgba(0,0,0,.55);margin-top:1px;}
+.hero-card .bill-row-due.late{color:#b0122f;font-weight:700;}
 .hero-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}

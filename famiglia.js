@@ -22,6 +22,8 @@ function renderFamUnified(){
     const eta = m.is_expected ? (r.due_date?dueLabel(r.due_date):'') : (r.birth_date?etaFromBirth(r.birth_date):'');
     const link = (typeof memberLinks!=='undefined') ? memberLinks[m.id] : null;
     const accesso = link ? (link.role==='admin'?'🟢 Account · admin':'🟢 Account attivo') : '⚪ Profilo gestito';
+    const st = (typeof memberState==='function') ? memberState(m) : null;
+    const pill = st ? `<span class="statepill" style="background:color-mix(in srgb,${st.c} 22%,transparent);color:color-mix(in srgb,${st.c} 55%,black);margin-right:8px;">${st.t}</span>` : '';
     const card=document.createElement('section'); card.className='hero-card';
     card.innerHTML=`
       <div class="hero-card-head" style="gap:12px;">
@@ -29,7 +31,7 @@ function renderFamUnified(){
           <span class="av" style="background:${m.color};width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;">${initial}</span>
           <div><h2 style="font-size:16px;">${m.display_name}</h2><div style="font-size:11px;color:rgba(0,0,0,.5);">${ruolo}${eta?' · '+eta:''}</div></div>
         </div>
-        <button class="editbtn" data-edit="${m.id}">✎</button>
+        <div style="display:flex;align-items:center;">${pill}<button class="editbtn" data-edit="${m.id}">✎</button></div>
       </div>
       <div>
         <div class="hr-grid">

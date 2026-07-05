@@ -425,6 +425,7 @@ async function loadTodayStates(){
 
   todayState.loaded = true;
   renderHomeMembersOnly();
+  if($('v-fam') && $('v-fam').classList.contains('on') && typeof renderFamUnified==='function') renderFamUnified();
 }
 
 function toMin(hhmm){ if(!hhmm) return 0; const [h,m]=hhmm.split(':').map(Number); return h*60+(m||0); }
@@ -572,26 +573,58 @@ async function loadHomeExtras(){
     });
   }
 
-  // questo mese: speso vs budget totale
-  const ym = new Date().toISOString().slice(0,7);
-  const [{ data: tx }, { data: buds }] = await Promise.all([
-    sb.from('transactions').select('amount,kind,tx_date').eq('household_id', state.household.id).gte('tx_date', ym+'-01'),
-    sb.from('budgets').select('monthly_limit').eq('household_id', state.household.id),
+  // disponibile: soldi liberi sul conto + soldi già accantonati nelle buste
+  const [{ data: accs }, { data: buds }] = await Promise.all([
+    sb.from('accounts').select('balance').eq('household_id', state.household.id),
+    sb.from('budgets').select('balance').eq('household_id', state.household.id),
   ]);
-  const speso = (tx||[]).filter(t=>t.kind==='uscita').reduce((s,t)=>s+(+t.amount||0),0);
-  const budget = (buds||[]).reduce((s,b)=>s+(+b.monthly_limit||0),0);
-  const pct = budget>0 ? Math.min(100, Math.round(speso/budget*100)) : 0;
-  const over = budget>0 && speso>budget;
+  const conto = (accs||[]).reduce((s,a)=>s+(+a.balance||0),0);
+  const inBuste = (buds||[]).reduce((s,b)=>s+(+b.balance||0),0);
+  const totale = conto + inBuste;
   const mw=$('home-money');
   if(mw){
     mw.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div><div class="hc-label">Speso</div>
-          <div class="hc-value" style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;">${eur(speso)}</div></div>
-        <div style="text-align:right;"><div class="hc-label">Budget</div>
-          <div style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;color:${over?'#e23b5a':'#1fb46b'};">${budget>0?eur(budget):'—'}</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+        <div><div class="hc-label">Sul conto</div>
+          <div class="hc-value" style="font-family:var(--mono);font-size:20px;font-weight:800;margin-top:3px;">${eur(conto)}</div></div>
+        <div style="text-align:right;"><div class="hc-label">Nelle buste</div>
+          <div class="hc-value" style="font-family:var(--mono);font-size:20px;font-weight:800;margin-top:3px;">${eur(inBuste)}</div></div>
       </div>
-      ${budget>0?`<div class="bar" style="margin-top:12px;"><i style="width:${pct}%;background:${over?'#e23b5a':'var(--accent)'};"></i></div>`:''}`;
+      <div class="hc-total"><span class="hc-label">Totale disponibile</span>
+        <span class="hc-value" style="font-family:var(--mono);font-size:20px;font-weight:800;">${eur(totale)}</span></div>`;
+  }
+
+  // oggi a tavola: pranzo + cena di oggi
+  const oggiStr = new Date().toISOString().slice(0,10);
+  const { data: meals } = await sb.from('menu_entries').select('meal,dish')
+    .eq('household_id', state.household.id).eq('entry_date', oggiStr);
+  const mealW=$('home-meals');
+  if(mealW){
+    const find = k => (meals||[]).find(x=>x.meal===k);
+    const pranzo=find('pranzo'), cena=find('cena');
+    const rowM = (lbl,e)=>`<div class="meal-row"><span class="meal-lbl">${lbl}</span>`+
+      `<span class="meal-dish${e&&e.dish?'':' empty'}">${e&&e.dish?e.dish:'da decidere'}</span></div>`;
+    mealW.innerHTML = rowM('Pranzo',pranzo)+rowM('Cena',cena);
+  }
+
+  // da pagare: scadenze manuali entro 7 giorni o già scadute
+  const in7 = (()=>{ const d=new Date(); d.setDate(d.getDate()+7); return d.toISOString().slice(0,10); })();
+  const { data: bills } = await sb.from('recurring_bills').select('name,amount,next_due,auto_debit')
+    .eq('household_id', state.household.id).eq('active',true).eq('auto_debit',false)
+    .lte('next_due', in7).order('next_due');
+  const billW=$('home-bills');
+  if(billW){
+    if(!bills || bills.length===0){ billW.innerHTML='<div class="ev-empty">Niente da pagare a breve.</div>'; }
+    else {
+      billW.innerHTML = bills.slice(0,4).map(b=>{
+        const d=new Date((b.next_due||'')+'T12:00:00');
+        const scaduta = (b.next_due||'') < oggiStr;
+        const dd = d.toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+        return `<div class="bill-row"><div class="bill-row-l"><div class="hc-value" style="font-weight:700;">${b.name}</div>`+
+          `<div class="bill-row-due${scaduta?' late':''}">${scaduta?'⚠️ scaduta · ':''}${dd}</div></div>`+
+          `<div class="hc-value" style="font-family:var(--mono);font-weight:800;">${b.amount?eur(b.amount):'—'}</div></div>`;
+      }).join('');
+    }
   }
 }
 
@@ -623,6 +656,8 @@ document.addEventListener('change', (e)=>{
 document.addEventListener('click', (e)=>{
   if(e.target.id==='home-goto-cal'){ document.querySelector('#tabbar .tab[data-v="cal"]').click(); }
   if(e.target.id==='home-goto-soldi'){ document.querySelector('#tabbar .tab[data-v="soldi"]').click(); }
+  if(e.target.id==='home-goto-menu'){ document.querySelector('#tabbar .tab[data-v="casa"]').click(); const s=document.querySelector('#casa-subnav .s[data-s="casa-menu"]'); if(s) s.click(); }
+  if(e.target.id==='home-goto-bills'){ document.querySelector('#tabbar .tab[data-v="soldi"]').click(); const s=document.querySelector('#soldi-subnav .s[data-s="sol-bol"]'); if(s) s.click(); }
   if(e.target.id==='home-open-settings'){ $('settings-modal').classList.remove('hidden'); refreshPatternToggle(); }
   if(e.target.id==='settings-close'){ $('settings-modal').classList.add('hidden'); }
   if(e.target.id==='settings-modal'){ $('settings-modal').classList.add('hidden'); }

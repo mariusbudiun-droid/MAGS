@@ -88,17 +88,22 @@
       </header>
 
       <section class="hero-card">
-        <div class="hero-card-head"><h2>La famiglia</h2></div>
-        <div id="home-members"></div>
-      </section>
-
-      <section class="hero-card">
         <div class="hero-card-head"><h2>Prossimi impegni</h2><button class="editbtn" id="home-goto-cal">Tutto →</button></div>
         <div id="home-agenda"></div>
       </section>
 
       <section class="hero-card">
-        <div class="hero-card-head"><h2>Questo mese</h2><button class="editbtn" id="home-goto-soldi">Soldi →</button></div>
+        <div class="hero-card-head"><h2>Oggi a tavola</h2><button class="editbtn" id="home-goto-menu">Menù →</button></div>
+        <div id="home-meals"></div>
+      </section>
+
+      <section class="hero-card">
+        <div class="hero-card-head"><h2>Da pagare</h2><button class="editbtn" id="home-goto-bills">Soldi →</button></div>
+        <div id="home-bills"></div>
+      </section>
+
+      <section class="hero-card">
+        <div class="hero-card-head"><h2>Disponibile</h2><button class="editbtn" id="home-goto-soldi">Soldi →</button></div>
         <div id="home-money"></div>
       </section>
 
@@ -640,9 +645,9 @@
 
   <!-- tabbar -->
   <nav class="tabbar" id="tabbar">
-    <div class="tab on" data-v="oggi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Oggi</div>
+    <div class="tab on" data-v="oggi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke-linecap="round"/></svg>Oggi</div>
     <div class="tab" data-v="cal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>Calendario</div>
-    <div class="tab" data-v="casa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>Casa</div>
+    <div class="tab" data-v="casa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 21v-6h6v6" stroke-linecap="round"/></svg>Casa</div>
     <div class="tab" data-v="soldi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Soldi</div>
     <div class="tab" data-v="fam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="3"/><circle cx="17" cy="9" r="2.2"/><path d="M2 20c0-3 3-5 7-5s7 2 7 5M16 14c3 0 5 1.5 5 4"/></svg>Famiglia</div>
   </nav>
