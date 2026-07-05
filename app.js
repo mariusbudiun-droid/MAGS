@@ -175,6 +175,8 @@ async function loadHousehold(householdId, myMemberId){
   state.household = hh;
   state.members = magsSort(ms || []);
   state.me = state.members.find(m => m.id === myMemberId) || null;
+  // controlla scadenze in arrivo / domiciliate (dopo un attimo, così la home è già pronta)
+  try{ if(typeof loadSoldiAll==='function' && typeof checkBillAlerts==='function'){ await loadSoldiAll(); await checkBillAlerts(); } }catch(e){ console.warn('bill alerts', e); }
 }
 
 // ============================================================

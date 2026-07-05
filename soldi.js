@@ -243,18 +243,84 @@ function renderBollette(){
   });
 }
 
-// segna una scadenza come pagata: scala da conto/busta, crea movimento, sposta al mese dopo
+// ============================================================
+// ALLERTE SCADENZE (popup) + domiciliate automatiche
+// ============================================================
+let billAlertQueue = [];
+let billAlertSnoozed = {}; // id → true (per questa sessione, "più tardi")
+
+async function checkBillAlerts(){
+  if(!soldi.bills || !soldi.bills.length) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const in3 = new Date(today); in3.setDate(in3.getDate()+3);
+  const todayStr = today.toISOString().slice(0,10);
+
+  // 1) domiciliate scadute → pagale da sole (con avviso)
+  const autoPaid = [];
+  for(const b of soldi.bills){
+    if(!b.auto_debit) continue;
+    if(!b.next_due || b.next_due > todayStr) continue;
+    // importo: se variabile non possiamo indovinare → salta (la gestisci a mano)
+    const amount = +b.amount||0;
+    if(!amount || b.variable_amount) continue;
+    // scala dal conto comune (o primo conto)
+    const acc = soldi.accounts.find(a=>a.kind==='comune')||soldi.accounts[0];
+    if(!acc) continue;
+    await settleBill(b, amount, { kind:'acc', id:acc.id });
+    autoPaid.push(`${b.name} (${eur(amount)})`);
+  }
+  if(autoPaid.length){
+    await loadSoldiAll();
+    alert('Domiciliazioni addebitate automaticamente:\n\n• '+autoPaid.join('\n• '));
+  }
+
+  // 2) manuali in scadenza (entro 3 giorni o già scadute) → coda popup
+  billAlertQueue = soldi.bills.filter(b=>{
+    if(b.auto_debit) return false;
+    if(!b.next_due) return false;
+    if(billAlertSnoozed[b.id]) return false;
+    return b.next_due <= in3.toISOString().slice(0,10);
+  });
+  showNextBillAlert();
+}
+
+function showNextBillAlert(){
+  if(!billAlertQueue.length){ $('billalert-modal').classList.add('hidden'); return; }
+  const b = billAlertQueue[0];
+  const due = new Date(b.next_due+'T12:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const days = Math.round((due-today)/86400000);
+  const when = days<0 ? `scaduta da ${-days} giorni` : days===0 ? 'scade oggi' : `scade tra ${days} giorni`;
+  $('billalert-title').textContent = b.name;
+  $('billalert-msg').textContent = `${b.amount?eur(b.amount):'Importo variabile'} · ${when}.`;
+  $('billalert-modal').classList.remove('hidden');
+}
+
+$('billalert-pay').addEventListener('click', async ()=>{
+  const b = billAlertQueue.shift();
+  $('billalert-modal').classList.add('hidden');
+  if(b) await payBill(b);
+  showNextBillAlert();
+});
+$('billalert-later').addEventListener('click', ()=>{
+  const b = billAlertQueue.shift();
+  if(b) billAlertSnoozed[b.id]=true; // non ripresentare in questa sessione
+  $('billalert-modal').classList.add('hidden');
+  showNextBillAlert();
+});
+
+// segna una scadenza come pagata: scala da conto/busta, crea movimento, sposta avanti
 async function payBill(b){
   const hid=state.household.id;
-  // importo: usa quello salvato o chiedi
+  // importo: fisso salvato, oppure chiedi se variabile o mancante
   let amount = +b.amount || 0;
-  if(!amount){
+  if(b.variable_amount || !amount){
     const raw = prompt(`Quanto hai pagato per "${b.name}"? (€)`, '');
     if(raw===null) return;
     amount = parseFloat((raw||'').replace(',','.'));
     if(isNaN(amount) || amount<=0){ alert('Importo non valido.'); return; }
   }
-  // costruisci l'elenco delle fonti: conti + buste
+  // fonti: conti + buste
   const sources = [];
   soldi.accounts.forEach(a=> sources.push({ kind:'acc', id:a.id, label:`${a.icon||'🏦'} ${a.name} (${eur(+a.balance||0)})` }));
   soldi.budgets.forEach(bu=> sources.push({ kind:'bud', id:bu.id, label:`✉️ ${bu.name} (${eur(+bu.balance||0)})` }));
@@ -265,9 +331,14 @@ async function payBill(b){
   const idx = parseInt(pick,10)-1;
   if(isNaN(idx) || idx<0 || idx>=sources.length){ alert('Scelta non valida.'); return; }
   const src = sources[idx];
-  const today = new Date().toISOString().slice(0,10);
+  await settleBill(b, amount, src);
+  alert(`✓ ${b.name} pagato — ${eur(amount)} scalati da ${src.label.replace(/\s*\(.*\)/,'')}.`);
+}
 
-  // crea il movimento di uscita e aggiorna il saldo
+// esegue il pagamento vero e proprio (movimento + saldo + avanzamento scadenza)
+async function settleBill(b, amount, src){
+  const hid=state.household.id;
+  const today = new Date().toISOString().slice(0,10);
   if(src.kind==='acc'){
     const acc = soldi.accounts.find(a=>a.id===src.id);
     await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
@@ -277,15 +348,16 @@ async function payBill(b){
     await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
     await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
   }
-
-  // sposta la scadenza al mese successivo
-  if(b.next_due){
-    const nd=new Date(b.next_due+'T12:00:00'); nd.setMonth(nd.getMonth()+1);
+  // avanza la scadenza secondo la frequenza (0 = una tantum → disattiva)
+  const freq = (b.freq_months!=null) ? b.freq_months : 1;
+  if(freq>0 && b.next_due){
+    const nd=new Date(b.next_due+'T12:00:00'); nd.setMonth(nd.getMonth()+freq);
     await sb.from('recurring_bills').update({ next_due: nd.toISOString().slice(0,10) }).eq('id', b.id);
+  } else if(freq===0){
+    await sb.from('recurring_bills').update({ active:false }).eq('id', b.id);
   }
   await loadSoldiAll();
   renderBollette(); renderConti(); reloadBalances && reloadBalances();
-  alert(`✓ ${b.name} pagato — ${eur(amount)} scalati da ${src.label.replace(/\s*\(.*\)/,'')}.`);
 }
 
 // ---------- OBIETTIVI ----------
@@ -513,6 +585,9 @@ function openBillModal(b){
   editingBill=b?b.id:null;
   $('bill-name').value=b?b.name:''; $('bill-amount').value=b&&b.amount?b.amount:'';
   $('bill-due').value=b?b.next_due:new Date().toISOString().slice(0,10);
+  $('bill-variable').checked = b ? !!b.variable_amount : false;
+  $('bill-freq').value = b && b.freq_months!=null ? String(b.freq_months) : '1';
+  $('bill-paytype').value = b && b.auto_debit ? 'auto' : 'manuale';
   $('bill-delete').style.display=b?'block':'none';
   clearError('bill-error'); $('bill-modal').classList.remove('hidden');
 }
@@ -521,9 +596,14 @@ $('bill-modal').addEventListener('click', e=>{ if(e.target.id==='bill-modal') $(
 $('sol-add-bill').addEventListener('click', ()=>openBillModal(null));
 $('bill-save').addEventListener('click', async ()=>{
   const name=$('bill-name').value.trim();
-  const amount=parseFloat(($('bill-amount').value||'').replace(',','.'))||null;
+  const variable=$('bill-variable').checked;
+  const amount=variable?null:(parseFloat(($('bill-amount').value||'').replace(',','.'))||null);
   if(!name){ showError('bill-error','Il nome è richiesto.'); return; }
-  const payload={ household_id:state.household.id, name, amount, frequency:'mensile', next_due:$('bill-due').value, active:true };
+  const payload={ household_id:state.household.id, name, amount,
+    freq_months: parseInt($('bill-freq').value,10),
+    variable_amount: variable,
+    auto_debit: $('bill-paytype').value==='auto',
+    next_due:$('bill-due').value, active:true };
   let error;
   if(editingBill){ ({error}=await sb.from('recurring_bills').update(payload).eq('id', editingBill)); }
   else { ({error}=await sb.from('recurring_bills').insert(payload)); }

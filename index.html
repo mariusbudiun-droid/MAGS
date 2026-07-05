@@ -547,14 +547,40 @@
     </div>
   </div>
 
+  <!-- Modal allerta scadenza -->
+  <div class="modal hidden" id="billalert-modal">
+    <div class="modal-card" style="text-align:center;">
+      <div style="font-size:34px;">📌</div>
+      <h2 class="modal-title" id="billalert-title" style="margin-top:6px;">Scadenza in arrivo</h2>
+      <p class="placeholder-text" id="billalert-msg" style="margin-top:4px;"></p>
+      <button class="btn-primary" id="billalert-pay" style="margin-top:14px;">Paga ora</button>
+      <button class="btn-ghost" id="billalert-later" style="margin-top:8px;">Più tardi</button>
+    </div>
+  </div>
+
   <!-- Modal bolletta -->
   <div class="modal hidden" id="bill-modal">
     <div class="modal-card">
       <h2 class="modal-title">Scadenza</h2>
       <label class="field-label">Nome</label>
       <input class="field" id="bill-name" placeholder="Es. Luce, Affitto, Gas">
-      <label class="field-label">Importo € (se lo sai, altrimenti lascia vuoto)</label>
+      <label class="field-label">Importo € (se fisso; lascia vuoto se variabile)</label>
       <input class="field" id="bill-amount" type="text" inputmode="decimal" placeholder="variabile">
+      <label class="checkbox-row"><input type="checkbox" id="bill-variable"> Importo variabile (lo chiede a ogni pagamento)</label>
+      <label class="field-label">Ogni quanto</label>
+      <select class="field" id="bill-freq">
+        <option value="1">Ogni mese</option>
+        <option value="2">Ogni 2 mesi</option>
+        <option value="3">Ogni 3 mesi</option>
+        <option value="6">Ogni 6 mesi</option>
+        <option value="12">Ogni anno</option>
+        <option value="0">Una tantum (non ricorrente)</option>
+      </select>
+      <label class="field-label">Pagamento</label>
+      <select class="field" id="bill-paytype">
+        <option value="manuale">Manuale (premo io "Pagato")</option>
+        <option value="auto">Domiciliata (esce da sola)</option>
+      </select>
       <label class="field-label">Prossima scadenza</label>
       <input class="field" id="bill-due" type="date">
       <button class="btn-primary" id="bill-save">Salva</button>
