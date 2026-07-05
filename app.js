@@ -484,7 +484,7 @@ function renderHomeMembersOnly(){
     cell.className='mcell'+(m.is_expected?' locked':'');
     cell.innerHTML = `<span class="av" style="background:${m.color}">${initial}</span>
       <div class="mcell-txt"><div class="mn">${m.display_name}</div><div class="ms">${sub}</div></div>
-      <span class="statepill" style="background:color-mix(in srgb,${st.c} 20%,transparent);color:${st.c}">${st.t}</span>`;
+      <span class="statepill" style="background:color-mix(in srgb,${st.c} 22%,transparent);color:color-mix(in srgb,${st.c} 55%,black)">${st.t}</span>`;
     wrap.appendChild(cell);
   });
 }
@@ -586,9 +586,9 @@ async function loadHomeExtras(){
   if(mw){
     mw.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <div><div style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Speso</div>
-          <div style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;">${eur(speso)}</div></div>
-        <div style="text-align:right;"><div style="font-size:11px;color:var(--ink-soft);font-weight:700;text-transform:uppercase;letter-spacing:.08em;">Budget</div>
+        <div><div class="hc-label">Speso</div>
+          <div class="hc-value" style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;">${eur(speso)}</div></div>
+        <div style="text-align:right;"><div class="hc-label">Budget</div>
           <div style="font-family:var(--mono);font-size:22px;font-weight:800;margin-top:3px;color:${over?'#e23b5a':'#1fb46b'};">${budget>0?eur(budget):'—'}</div></div>
       </div>
       ${budget>0?`<div class="bar" style="margin-top:12px;"><i style="width:${pct}%;background:${over?'#e23b5a':'var(--accent)'};"></i></div>`:''}`;

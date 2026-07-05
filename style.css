@@ -356,6 +356,8 @@ select.field{appearance:none;-webkit-appearance:none;background-image:url("data:
 .hero-card .hr-cell .hl{color:rgba(0,0,0,.55);}
 .hero-card .hr-cell .hv{color:#1a1014;}
 .hero-card .hero-card-head > div div[style*="color"]{color:rgba(0,0,0,.6)!important;}
+.hero-card .hc-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(0,0,0,.6);}
+.hero-card .hc-value{color:#1a1014;}
 .hero-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .hero-card-head h2{font-size:16px;margin:0;position:relative;padding-left:12px;}
 .hero-card-head h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:4px;height:16px;border-radius:3px;background:var(--accent);}
