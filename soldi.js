@@ -391,11 +391,15 @@ function renderConti(){
 }
 function renderCategorie(){
   const wrap=$('sol-catlist'); wrap.innerHTML='';
+  // speso del mese per categoria (solo uscite)
+  const spesoCat={};
+  thisMonthTx().filter(t=>t.kind==='uscita').forEach(t=>{ const k=t.category_id||'_'; spesoCat[k]=(spesoCat[k]||0)+(+t.amount||0); });
   soldi.categories.forEach(c=>{
     const col=catColor(c);
+    const speso=spesoCat[c.id]||0;
     const row=document.createElement('div'); row.className='cat';
     row.innerHTML=`<div class="ci" style="background:color-mix(in srgb,${col} 18%,transparent)">${c.icon||'💸'}</div>
-      <div class="grow"><div class="cn">${c.name}</div></div>
+      <div class="grow"><div class="cn">${c.name}</div><div class="cat-spent">${speso>0?eur(speso)+' questo mese':'—'}</div></div>
       <button class="del" title="Elimina">×</button>`;
     row.querySelector('.del').onclick=async ()=>{
       if(!confirm(`Eliminare la categoria "${c.name}"?`)) return;
