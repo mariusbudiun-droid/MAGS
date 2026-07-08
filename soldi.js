@@ -445,6 +445,44 @@ function renderConti(){
     wrap.appendChild(row);
   });
 }
+
+// RICOSTRUZIONE: ricalcola tutti i saldi (conti e buste) sommando le transazioni.
+// Utile per riparare saldi sballati: le transazioni sono la fonte di verità.
+async function recalcAllBalances(){
+  const accSum={}; const budSum={};
+  soldi.accounts.forEach(a=>accSum[a.id]=0);
+  soldi.budgets.forEach(b=>budSum[b.id]=0);
+  soldi.transactions.forEach(t=>{
+    const amt=+t.amount||0;
+    if(t.kind==='entrata'){
+      if(t.to_budget!=null && budSum[t.to_budget]!=null) budSum[t.to_budget]+=amt;
+      else if(t.account_id!=null && accSum[t.account_id]!=null) accSum[t.account_id]+=amt;
+    } else if(t.kind==='uscita'){
+      if(t.from_budget!=null && budSum[t.from_budget]!=null) budSum[t.from_budget]-=amt;
+      else if(t.account_id!=null && accSum[t.account_id]!=null) accSum[t.account_id]-=amt;
+    } else if(t.kind==='giroconto'){
+      if(t.from_account!=null && accSum[t.from_account]!=null) accSum[t.from_account]-=amt;
+      if(t.from_budget!=null && budSum[t.from_budget]!=null) budSum[t.from_budget]-=amt;
+      if(t.to_account!=null && accSum[t.to_account]!=null) accSum[t.to_account]+=amt;
+      if(t.to_budget!=null && budSum[t.to_budget]!=null) budSum[t.to_budget]+=amt;
+    }
+  });
+  // anteprima
+  const round=n=>Math.round(n*100)/100;
+  let msg='Ricalcolo dai movimenti:\n\n';
+  soldi.accounts.forEach(a=>{ msg+=`${a.icon||'🏦'} ${a.name}: ${eur(a.balance)} → ${eur(round(accSum[a.id]))}\n`; });
+  soldi.budgets.forEach(b=>{ const c=catById(b.category_id); msg+=`✉️ ${c?c.name:'Busta'}: ${eur(b.balance)} → ${eur(round(budSum[b.id]))}\n`; });
+  msg+='\nApplico questi valori?';
+  if(!confirm(msg)) return;
+  try{
+    for(const a of soldi.accounts){ await sb.from('accounts').update({ balance:round(accSum[a.id]) }).eq('id', a.id); }
+    for(const b of soldi.budgets){ await sb.from('budgets').update({ balance:round(budSum[b.id]) }).eq('id', b.id); }
+    await loadSoldiAll(); renderPanoramica(); renderConti(); renderBudget(); renderCategorie();
+    alert('✓ Saldi ricalcolati dai movimenti.');
+  }catch(err){ alert('Errore nel ricalcolo: '+(err.message||err)); }
+}
+const _recalcBtn=$('sol-recalc'); if(_recalcBtn) _recalcBtn.addEventListener('click', recalcAllBalances);
+
 function renderCategorie(){
   const wrap=$('sol-catlist'); wrap.innerHTML='';
   // speso del mese per categoria (solo uscite)
