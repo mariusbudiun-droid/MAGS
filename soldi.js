@@ -135,10 +135,50 @@ function renderBudget(){
       <div class="bar"><i style="width:${pct}%;background:${vuota?'#e23b5a':col}"></i></div>
       <div class="bsub">${sforata?'⚠️ busta sforata · ':''}nella busta ${eur(bal)} di ${eur(limit)} · tocca per gestire</div>`;
     item.style.cursor='pointer';
-    item.onclick=()=>manageBusta(b);
+    item.onclick=()=>openBustaDetail(b);
     wrap.appendChild(item);
   });
 }
+
+let currentBusta=null;
+function openBustaDetail(b){
+  currentBusta=b;
+  const c=catById(b.category_id);
+  const col=catColor(c);
+  const bal=+b.balance||0, limit=+b.monthly_limit||0;
+  const usato=Math.max(0,limit-bal);
+  const pct=limit>0?Math.min(100,Math.round(usato/limit*100)):0;
+  const sforata=bal<0;
+  $('busta-title').textContent=`${c?.icon||'🧧'} ${c?c.name:'Busta'}`;
+  $('busta-head').innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:baseline;">
+      <span style="font-family:var(--mono);font-size:22px;font-weight:800;${sforata?'color:#e23b5a':''}">${eur(bal)}</span>
+      <span style="color:var(--ink-soft);font-size:13px;">di ${eur(limit)}</span>
+    </div>
+    <div class="bar" style="margin-top:8px;"><i style="width:${pct}%;background:${bal<=0?'#e23b5a':col}"></i></div>
+    <div style="color:var(--ink-soft);font-size:12px;margin-top:6px;">${sforata?'⚠️ busta sforata · ':''}usato ${eur(usato)} questo ciclo</div>`;
+  // movimenti collegati a questa busta (entrate e uscite)
+  const txs=soldi.transactions.filter(t=>t.from_budget===b.id||t.to_budget===b.id);
+  const list=$('busta-txlist');
+  if(!txs.length){ list.innerHTML='<div class="sol-empty">Nessun movimento su questa busta.</div>'; }
+  else {
+    list.innerHTML='';
+    txs.slice(0,60).forEach(t=>{
+      const entra = t.to_budget===b.id; // soldi entrati nella busta
+      const sign = entra?'pos':'neg';
+      const pref = entra?'+':'−';
+      const d=new Date((t.tx_date||'')+'T12:00:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'});
+      const row=document.createElement('div'); row.className='tx';
+      row.innerHTML=`<div><div class="ti">${t.description||'Movimento'}</div>
+        <div class="tm">${d} · ${t.kind}</div></div>
+        <div class="ta ${sign}">${pref}${eur(t.amount).replace('€ ','')}</div>`;
+      list.appendChild(row);
+    });
+  }
+  $('busta-modal').classList.remove('hidden');
+}
+$('busta-close').addEventListener('click', ()=>$('busta-modal').classList.add('hidden'));
+$('busta-manage').addEventListener('click', ()=>{ $('busta-modal').classList.add('hidden'); if(currentBusta) manageBusta(currentBusta); });
 
 async function manageBusta(b){
   const c=catById(b.category_id);
