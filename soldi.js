@@ -190,7 +190,8 @@ async function manageBusta(b){
     `1 — Aggiungi soldi dal conto\n`+
     `2 — Togli soldi e rimettili nel conto\n`+
     `3 — Reset busta (azzera e reimposta budget)\n`+
-    `4 — Elimina busta`
+    `4 — Elimina busta\n`+
+    `5 — Correggi saldo (senza toccare il conto)`
   );
   if(scelta===null) return;
   const corrente=soldi.accounts.find(a=>a.kind==='comune')||soldi.accounts[0];
@@ -257,6 +258,21 @@ async function manageBusta(b){
       const { error: delErr } = await sb.from('budgets').delete().eq('id', b.id);
       if(delErr){ alert('Non riesco a eliminare la busta: '+delErr.message); return; }
       alert(`Busta "${nome}" eliminata.`);
+
+    } else if(opt==='5'){
+      // CORREZIONE: imposta il saldo esatto della busta senza toccare i conti.
+      // Registra un movimento di aggiustamento così il dettaglio resta coerente.
+      const nuovo=parseFloat((prompt(`Correggi il saldo di "${nome}".\nQuanto c'è DAVVERO dentro ora? (€)\n\nNon tocca i conti: serve solo a riallineare la busta.`, String(bal))||'').replace(',','.'));
+      if(isNaN(nuovo)) return;
+      const delta=Math.round((nuovo-bal)*100)/100;
+      if(delta===0){ alert('Saldo già corretto.'); return; }
+      await sb.from('budgets').update({ balance:nuovo }).eq('id', b.id);
+      if(delta>0){
+        await sb.from('transactions').insert({ household_id:hid, kind:'entrata', amount:delta, to_budget:b.id, description:`Correzione saldo ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+      } else {
+        await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount:Math.abs(delta), from_budget:b.id, description:`Correzione saldo ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null });
+      }
+      alert(`Saldo di "${nome}" corretto a ${eur(nuovo)}.`);
 
     } else { return; }
 
@@ -498,7 +514,7 @@ async function revertTxEffect(tx){
     else { const a=soldi.accounts.find(x=>x.id===tx.account_id); if(a) await sb.from('accounts').update({balance:(+a.balance||0)-amt}).eq('id',a.id); }
   } else { // uscita
     if(tx.from_budget){ const b=soldi.budgets.find(x=>x.id===tx.from_budget); if(b) await sb.from('budgets').update({balance:(+b.balance||0)+amt}).eq('id',b.id); }
-    else { const bud=soldi.budgets.find(b=>b.category_id===tx.category_id); if(bud){ await sb.from('budgets').update({balance:(+bud.balance||0)+amt}).eq('id',bud.id); } else { const a=soldi.accounts.find(x=>x.id===tx.account_id); if(a) await sb.from('accounts').update({balance:(+a.balance||0)+amt}).eq('id',a.id); } }
+    else { const a=soldi.accounts.find(x=>x.id===tx.account_id); if(a) await sb.from('accounts').update({balance:(+a.balance||0)+amt}).eq('id',a.id); }
   }
 }
 function setTxKind(k){
@@ -606,9 +622,10 @@ $('tx-save').addEventListener('click', async ()=>{
           const acc=soldi.accounts.find(a=>a.id===selId);
           if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)+amount }).eq('id', acc.id);
         } else {
-          const bud = soldi.budgets.find(b=>b.category_id===payload.category_id);
-          if(bud){ await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id); }
-          else { const acc=soldi.accounts.find(a=>a.id===selId); if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id); }
+          // uscita da conto: scala SEMPRE dal conto scelto.
+          // La categoria è solo un'etichetta per i report, non decide da dove escono i soldi.
+          const acc=soldi.accounts.find(a=>a.id===selId);
+          if(acc) await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
         }
       }
     }
