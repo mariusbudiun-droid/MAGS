@@ -115,6 +115,28 @@ function printShoppingList(){
 }
 const _printBtn=$('spesa-print'); if(_printBtn) _printBtn.addEventListener('click', printShoppingList);
 
+// ---- condividi lista (share nativo iOS → include WhatsApp; fallback wa.me) ----
+function buildListText(){
+  const items = casaState.currentItems || [];
+  const lista = (casaState.lists||[]).find(l=>l.id===casaState.currentList);
+  const nome = lista ? lista.name : 'Lista della spesa';
+  const righe = items.map(it=>`${it.checked?'✅':'▫️'} ${it.name}`).join('\n');
+  return `🛒 ${nome}\n\n${righe}`;
+}
+async function shareShoppingList(){
+  const items = casaState.currentItems || [];
+  if(!items.length){ alert('La lista è vuota.'); return; }
+  const text = buildListText();
+  const lista = (casaState.lists||[]).find(l=>l.id===casaState.currentList);
+  const nome = lista ? lista.name : 'Lista della spesa';
+  try{
+    if(navigator.share){ await navigator.share({ title:nome, text }); return; }
+  }catch(err){ if(err && err.name==='AbortError') return; }
+  // fallback: apri WhatsApp direttamente
+  window.open('https://wa.me/?text='+encodeURIComponent(text), '_blank');
+}
+const _shareBtn=$('spesa-share'); if(_shareBtn) _shareBtn.addEventListener('click', shareShoppingList);
+
 // ---- impostazioni lista: busta (categoria) + conto (solo se no busta) ----
 async function openListConfig(){
   if(!casaState.currentList){ return; }
