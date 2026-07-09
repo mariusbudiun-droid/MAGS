@@ -48,6 +48,7 @@ async function loadItems(){
 }
 
 function renderItems(items){
+  casaState.currentItems = items;
   const wrap=$('casa-items'); wrap.innerHTML='';
   if(items.length===0){ wrap.innerHTML='<div class="shop-empty">Lista vuota. Aggiungi qualcosa qui sotto.</div>'; return; }
   items.forEach(it=>{
@@ -94,6 +95,25 @@ async function addItem(){
 }
 $('casa-additem').addEventListener('click', addItem);
 $('casa-newitem').addEventListener('keydown', e=>{ if(e.key==='Enter') addItem(); });
+
+// ---- stampa / PDF della lista spesa ----
+function printShoppingList(){
+  const items = casaState.currentItems || [];
+  const lista = (casaState.lists||[]).find(l=>l.id===casaState.currentList);
+  const nome = lista ? lista.name : 'Lista della spesa';
+  if(!items.length){ alert('La lista è vuota.'); return; }
+  const oggi = new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const esc = s => (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const rows = items.map(it=>{
+    const who = state.members.find(m=>m.id===it.added_by);
+    return `<div class="pitem${it.checked?' done':''}"><span class="pbox"></span>`+
+      `<span class="pname">${esc(it.name)}</span>`+
+      `<span class="pwho">${who?esc(who.display_name):''}</span></div>`;
+  }).join('');
+  $('print-area').innerHTML = `<h1>${esc(nome)}</h1><div class="psub">${oggi} · ${items.length} articoli</div>${rows}`;
+  window.print();
+}
+const _printBtn=$('spesa-print'); if(_printBtn) _printBtn.addEventListener('click', printShoppingList);
 
 // ---- impostazioni lista: busta (categoria) + conto (solo se no busta) ----
 async function openListConfig(){

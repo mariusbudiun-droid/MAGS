@@ -470,7 +470,19 @@ input[type="date"], input[type="time"]{max-width:100%;width:100%;min-width:0;box
 .cat .ci{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex:none;background:var(--surface2);}
 .cat .cn{font-weight:700;font-size:14.5px;}
 .cat .cat-spent{font-size:12px;color:var(--ink-soft);font-family:var(--mono);margin-top:2px;}
-.busta-txlist{max-height:40vh;overflow-y:auto;padding-right:10px;scrollbar-gutter:stable;}
+#print-area{display:none;}
+@media print{
+  body{background:#fff!important;}
+  body > *:not(#print-area){display:none!important;}
+  #print-area{display:block!important;color:#000;padding:0;font-family:-apple-system,system-ui,sans-serif;}
+  #print-area h1{font-size:22px;margin:0 0 2px;}
+  #print-area .psub{font-size:12px;color:#555;margin:0 0 16px;}
+  #print-area .pitem{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #ddd;font-size:15px;}
+  #print-area .pbox{width:16px;height:16px;border:1.5px solid #333;border-radius:3px;flex:none;display:inline-block;}
+  #print-area .pitem.done .pbox{background:#333;}
+  #print-area .pitem.done .pname{text-decoration:line-through;color:#888;}
+  #print-area .pwho{margin-left:auto;font-size:12px;color:#888;}
+}
 .busta-txlist::-webkit-scrollbar{width:4px;}
 .busta-txlist::-webkit-scrollbar-thumb{background:rgba(128,128,128,.4);border-radius:4px;}
 .cat .cb{font-size:11.5px;color:var(--ink-soft);margin-top:1px;}
