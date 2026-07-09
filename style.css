@@ -434,7 +434,7 @@ input[type="date"], input[type="time"]{max-width:100%;width:100%;min-width:0;box
 .shop .box{width:30px;height:30px;border-radius:9px;border:2.5px solid var(--ink-soft);flex:none;position:relative;cursor:pointer;}
 .shop .box.ck{background:var(--accent);border-color:var(--accent);}
 .shop .box.ck::after{content:"✓";color:var(--accent-ink);font-size:18px;font-weight:800;position:absolute;inset:0;display:grid;place-items:center;}
-.shop .nm{font-weight:600;font-size:15px;flex:1;}
+.shop .nm{font-weight:600;font-size:15px;flex:1;cursor:text;}
 .shop.done .nm{text-decoration:line-through;color:var(--ink-soft);}
 .shop .who{font-size:10px;color:var(--ink-soft);font-weight:700;}
 .shop .del{background:none;border:none;color:var(--ink-soft);font-size:18px;cursor:pointer;padding:0 2px;flex:none;}

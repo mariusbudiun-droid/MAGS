@@ -62,6 +62,13 @@ function renderItems(items){
       await sb.from('shopping_items').update({ checked: !it.checked }).eq('id', it.id);
       loadItems();
     };
+    row.querySelector('.nm').onclick=async ()=>{
+      const nuovo=prompt('Modifica articolo:', it.name);
+      if(nuovo===null) return;
+      const v=nuovo.trim(); if(!v){ alert('Il nome non può essere vuoto.'); return; }
+      await sb.from('shopping_items').update({ name:v }).eq('id', it.id);
+      loadItems();
+    };
     row.querySelector('.del').onclick=async ()=>{
       await sb.from('shopping_items').delete().eq('id', it.id);
       loadItems();

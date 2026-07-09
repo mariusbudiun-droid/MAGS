@@ -73,11 +73,14 @@ function thisMonthTx(){
 
 // ---------- PANORAMICA ----------
 function renderPanoramica(){
-  const total = soldi.accounts.reduce((s,a)=>s + (+a.balance||0), 0);
+  const inConti = soldi.accounts.reduce((s,a)=>s + (+a.balance||0), 0);
+  const inBuste = soldi.budgets.reduce((s,b)=>s + (+b.balance||0), 0);
+  const total = inConti + inBuste;
   $('sol-total').textContent = eur(total);
   const tm = thisMonthTx();
-  const inc = tm.filter(t=>t.kind==='entrata').reduce((s,t)=>s+(+t.amount||0),0);
-  const out = tm.filter(t=>t.kind==='uscita').reduce((s,t)=>s+(+t.amount||0),0);
+  const isCorrezione = t => (t.description||'').startsWith('Correzione saldo');
+  const inc = tm.filter(t=>t.kind==='entrata' && !isCorrezione(t)).reduce((s,t)=>s+(+t.amount||0),0);
+  const out = tm.filter(t=>t.kind==='uscita' && !isCorrezione(t)).reduce((s,t)=>s+(+t.amount||0),0);
   $('sol-in').textContent = eur(inc);
   $('sol-out').textContent = eur(out);
 
