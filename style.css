@@ -470,6 +470,19 @@ input[type="date"], input[type="time"]{max-width:100%;width:100%;min-width:0;box
 .cat .ci{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;font-size:17px;flex:none;background:var(--surface2);}
 .cat .cn{font-weight:700;font-size:14.5px;}
 .cat .cat-spent{font-size:12px;color:var(--ink-soft);font-family:var(--mono);margin-top:2px;}
+/* variante "flat": hero-card resa bianca in stile iOS (meno blu) */
+.hero-card.flat{background:var(--surface);border:1px solid var(--line);}
+.hero-card.flat .hero-card-head .editbtn{background:none;border:1px solid var(--accent);color:var(--accent);}
+.hero-card.flat .hc-total{border-top-color:rgba(0,0,0,.08);}
+.hero-card.flat .meal-row+.meal-row,
+.hero-card.flat .bill-row+.bill-row{border-top-color:rgba(0,0,0,.08);}
+.hero-card.flat .ev{border-color:rgba(0,0,0,.08);}
+.hero-card.flat .fam-row,
+.hero-card.flat .fam-field{border-top-color:rgba(0,0,0,.08);}
+.hero-card.flat .fam-chev{color:rgba(0,0,0,.3);}
+.hero-card.flat .fam-group-h{color:rgba(0,0,0,.4);}
+.hero-card.flat .fam-field .fl{color:rgba(0,0,0,.45);}
+
 .fam-row{display:flex;align-items:center;gap:11px;padding:12px 2px;cursor:pointer;border-top:1px solid rgba(255,255,255,.28);}
 .fam-row:first-of-type{border-top:none;}
 .fam-row .av{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;flex:none;}

@@ -15,7 +15,7 @@ function escapeHtml(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&'
 // vista unica: UNA hero con tutti i membri, ognuno apribile a fisarmonica
 function renderFamUnified(){
   const wrap=$('fam-unified'); if(!wrap) return; wrap.innerHTML='';
-  const hero=document.createElement('section'); hero.className='hero-card';
+  const hero=document.createElement('section'); hero.className='hero-card flat';
   let html=`<div class="hero-card-head"><h2>La famiglia</h2></div>`;
   state.members.forEach(m=>{
     const initial=(m.display_name||'?').charAt(0).toUpperCase();
