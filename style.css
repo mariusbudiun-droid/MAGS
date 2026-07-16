@@ -473,15 +473,29 @@ input[type="date"], input[type="time"]{max-width:100%;width:100%;min-width:0;box
 /* variante "flat": hero-card resa bianca in stile iOS (meno blu) */
 .hero-card.flat{background:var(--surface);border:1px solid var(--line);}
 .hero-card.flat .hero-card-head .editbtn{background:none;border:1px solid var(--accent);color:var(--accent);}
-.hero-card.flat .hc-total{border-top-color:rgba(0,0,0,.08);}
+/* testo legato al tema (leggibile in chiaro e scuro) */
+.hero-card.flat .hero-card-head h2,
+.hero-card.flat .hc-value,
+.hero-card.flat .meal-dish,
+.hero-card.flat .ev .ti,
+.hero-card.flat .fam-name,
+.hero-card.flat .fam-field .fv{color:var(--ink);}
+.hero-card.flat .hc-label,
+.hero-card.flat .meal-lbl,
+.hero-card.flat .meal-dish.empty,
+.hero-card.flat .bill-row-due,
+.hero-card.flat .ev .meta,
+.hero-card.flat .ev .time,
+.hero-card.flat .fam-sub,
+.hero-card.flat .fam-field .fl,
+.hero-card.flat .fam-group-h,
+.hero-card.flat .fam-chev{color:var(--ink-soft);}
+.hero-card.flat .hc-total,
 .hero-card.flat .meal-row+.meal-row,
-.hero-card.flat .bill-row+.bill-row{border-top-color:rgba(0,0,0,.08);}
-.hero-card.flat .ev{border-color:rgba(0,0,0,.08);}
+.hero-card.flat .bill-row+.bill-row,
+.hero-card.flat .ev,
 .hero-card.flat .fam-row,
-.hero-card.flat .fam-field{border-top-color:rgba(0,0,0,.08);}
-.hero-card.flat .fam-chev{color:rgba(0,0,0,.3);}
-.hero-card.flat .fam-group-h{color:rgba(0,0,0,.4);}
-.hero-card.flat .fam-field .fl{color:rgba(0,0,0,.45);}
+.hero-card.flat .fam-field{border-color:var(--line);}
 
 .fam-row{display:flex;align-items:center;gap:11px;padding:12px 2px;cursor:pointer;border-top:1px solid rgba(255,255,255,.28);}
 .fam-row:first-of-type{border-top:none;}
