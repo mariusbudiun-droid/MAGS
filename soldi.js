@@ -206,7 +206,7 @@ async function manageBusta(b){
     if(opt==='1'){
       const amt=parseFloat((prompt('Quanto aggiungere dal conto comune? (€)','0')||'0').replace(',','.'));
       if(!(amt>0)) return;
-      await sb.from('budgets').update({ balance:bal+amt, monthly_limit:(+b.monthly_limit||0)+amt }).eq('id', b.id);
+      await sb.from('budgets').update({ balance:bal+amt }).eq('id', b.id);
       if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)-amt }).eq('id', corrente.id);
         await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:amt, from_account:corrente.id, to_budget:b.id, description:`Aggiunta busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
 
