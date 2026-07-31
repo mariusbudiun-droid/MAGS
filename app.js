@@ -56,6 +56,24 @@ function magsSort(arr){
 
 // Helper DOM
 const $ = (id) => document.getElementById(id);
+
+// prompt numerico con tastierino (sostituisce prompt() per i numeri)
+function numPrompt(message, defaultVal='', opts){
+  opts = opts || {};
+  return new Promise(resolve=>{
+    const modal=$('num-modal'), msg=$('num-msg'), input=$('num-input'), ok=$('num-ok'), cancel=$('num-cancel');
+    if(!modal){ resolve(prompt(message, defaultVal)); return; }
+    msg.textContent = message;
+    input.value = (defaultVal==null)?'':String(defaultVal);
+    input.setAttribute('inputmode', opts.integer?'numeric':'decimal');
+    modal.classList.remove('hidden');
+    setTimeout(()=>{ try{ input.focus(); input.select(); }catch(e){} }, 60);
+    const cleanup=(val)=>{ modal.classList.add('hidden'); ok.onclick=null; cancel.onclick=null; input.onkeydown=null; resolve(val); };
+    ok.onclick=()=>cleanup(input.value);
+    cancel.onclick=()=>cleanup(null);
+    input.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); cleanup(input.value); } };
+  });
+}
 const show = (id) => $(id).classList.remove('hidden');
 const hide = (id) => $(id).classList.add('hidden');
 function onlyShow(id){

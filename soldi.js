@@ -187,7 +187,7 @@ async function manageBusta(b){
   const c=catById(b.category_id);
   const bal=+b.balance||0;
   const nome=c?c.name:'?';
-  const scelta = prompt(
+  const scelta = await numPrompt(
     `Busta "${nome}" — dentro ci sono ${eur(bal)} (budget ${eur(+b.monthly_limit||0)}).\n\n`+
     `Scrivi il NUMERO dell'azione:\n`+
     `1 — Aggiungi soldi dal conto\n`+
@@ -204,14 +204,14 @@ async function manageBusta(b){
 
   try{
     if(opt==='1'){
-      const amt=parseFloat((prompt('Quanto aggiungere dal conto comune? (€)','0')||'0').replace(',','.'));
+      const amt=parseFloat((await numPrompt('Quanto aggiungere dal conto comune? (€)','0')||'0').replace(',','.'));
       if(!(amt>0)) return;
       await sb.from('budgets').update({ balance:bal+amt }).eq('id', b.id);
       if(corrente){ await sb.from('accounts').update({ balance:(+corrente.balance||0)-amt }).eq('id', corrente.id);
         await sb.from('transactions').insert({ household_id:hid, kind:'giroconto', amount:amt, from_account:corrente.id, to_budget:b.id, description:`Aggiunta busta ${nome}`, tx_date:new Date().toISOString().slice(0,10), member_id:state.me?state.me.id:null }); }
 
     } else if(opt==='2'){
-      const amt=parseFloat((prompt('Quanto togliere e rimettere nel conto? (€)','0')||'0').replace(',','.'));
+      const amt=parseFloat((await numPrompt('Quanto togliere e rimettere nel conto? (€)','0')||'0').replace(',','.'));
       if(!(amt>0)) return;
       const tolto=Math.min(amt, bal);
       await sb.from('budgets').update({ balance:bal-tolto }).eq('id', b.id);
@@ -220,7 +220,7 @@ async function manageBusta(b){
 
     } else if(opt==='3'){
       // RESET: i soldi attuali tornano al conto, poi azzera e reimposta budget
-      const nuovo=parseFloat((prompt(`Reset busta "${nome}".\nNuovo budget mensile? (€)`, String(+b.monthly_limit||0))||'').replace(',','.'));
+      const nuovo=parseFloat((await numPrompt(`Reset busta "${nome}".\nNuovo budget mensile? (€)`, String(+b.monthly_limit||0))||'').replace(',','.'));
       if(isNaN(nuovo)||nuovo<0) return;
       // rimetti l'eventuale saldo residuo nel conto
       if(corrente && bal!==0){
@@ -235,7 +235,7 @@ async function manageBusta(b){
       // ELIMINA: chiedi dove vanno i soldi rimasti
       let dest='3';
       if(bal>0){
-        dest = prompt(
+        dest = await numPrompt(
           `Eliminare la busta "${nome}" — ci sono ancora ${eur(bal)}.\n\n`+
           `Dove vanno i soldi rimasti?\n`+
           `1 — Conto comune\n`+
@@ -265,7 +265,7 @@ async function manageBusta(b){
     } else if(opt==='5'){
       // CORREZIONE: imposta il saldo esatto della busta senza toccare i conti.
       // Registra un movimento di aggiustamento così il dettaglio resta coerente.
-      const nuovo=parseFloat((prompt(`Correggi il saldo di "${nome}".\nQuanto c'è DAVVERO dentro ora? (€)\n\nNon tocca i conti: serve solo a riallineare la busta.`, String(bal))||'').replace(',','.'));
+      const nuovo=parseFloat((await numPrompt(`Correggi il saldo di "${nome}".\nQuanto c'è DAVVERO dentro ora? (€)\n\nNon tocca i conti: serve solo a riallineare la busta.`, String(bal))||'').replace(',','.'));
       if(isNaN(nuovo)) return;
       const delta=Math.round((nuovo-bal)*100)/100;
       if(delta===0){ alert('Saldo già corretto.'); return; }
@@ -374,7 +374,7 @@ async function payBill(b){
   // importo: fisso salvato, oppure chiedi se variabile o mancante
   let amount = +b.amount || 0;
   if(b.variable_amount || !amount){
-    const raw = prompt(`Quanto hai pagato per "${b.name}"? (€)`, '');
+    const raw = await numPrompt(`Quanto hai pagato per "${b.name}"? (€)`, '');
     if(raw===null) return;
     amount = parseFloat((raw||'').replace(',','.'));
     if(isNaN(amount) || amount<=0){ alert('Importo non valido.'); return; }
@@ -385,7 +385,7 @@ async function payBill(b){
   soldi.budgets.forEach(bu=>{ const c=catById(bu.category_id); sources.push({ kind:'bud', id:bu.id, label:`✉️ ${c?c.name:'Busta'} (${eur(+bu.balance||0)})` }); });
   if(!sources.length){ alert('Nessun conto disponibile.'); return; }
   const menu = sources.map((s,i)=>`${i+1}. ${s.label}`).join('\n');
-  const pick = prompt(`Pagare "${b.name}" — ${eur(amount)}\nDa dove prendo i soldi?\n\n${menu}\n\nScrivi il numero:`, '1');
+  const pick = await numPrompt(`Pagare "${b.name}" — ${eur(amount)}\nDa dove prendo i soldi?\n\n${menu}\n\nScrivi il numero:`, '1');
   if(pick===null) return;
   const idx = parseInt(pick,10)-1;
   if(isNaN(idx) || idx<0 || idx>=sources.length){ alert('Scelta non valida.'); return; }
@@ -496,7 +496,7 @@ async function resetSoldi(){
     for(const b of soldi.budgets){ await sb.from('budgets').update({ balance:0 }).eq('id', b.id); }
     for(const a of soldi.accounts){
       const cur=+a.balance||0;
-      const val=prompt(`Saldo reale attuale di "${a.name}"? (€)\nSe è già giusto lascia il valore, altrimenti correggilo.`, String(cur));
+      const val=await numPrompt(`Saldo reale attuale di "${a.name}"? (€)\nSe è già giusto lascia il valore, altrimenti correggilo.`, String(cur));
       if(val!==null){ const n=parseFloat((val||'').replace(',','.')); if(!isNaN(n)) await sb.from('accounts').update({ balance:n }).eq('id', a.id); }
     }
     await loadSoldiAll();
