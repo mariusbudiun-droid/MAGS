@@ -486,6 +486,26 @@ async function recalcAllBalances(){
 }
 const _recalcBtn=$('sol-recalc'); if(_recalcBtn) _recalcBtn.addEventListener('click', recalcAllBalances);
 
+// AZZERA E RIPARTI: cancella tutti i movimenti, azzera le buste, imposta i saldi conti reali.
+// Restano conti, buste, categorie e scadenze.
+async function resetSoldi(){
+  if(!confirm('⚠️ AZZERARE tutti i movimenti?\n\nCancella TUTTE le transazioni (entrate, uscite, giroconti) e azzera le buste. Restano conti, buste, categorie e scadenze.\n\nQuesta azione NON si può annullare.')) return;
+  if(!confirm('Ultima conferma: vuoi davvero cancellare tutti i movimenti e ripartire da zero?')) return;
+  try{
+    await sb.from('transactions').delete().eq('household_id', state.household.id);
+    for(const b of soldi.budgets){ await sb.from('budgets').update({ balance:0 }).eq('id', b.id); }
+    for(const a of soldi.accounts){
+      const cur=+a.balance||0;
+      const val=prompt(`Saldo reale attuale di "${a.name}"? (€)\nSe è già giusto lascia il valore, altrimenti correggilo.`, String(cur));
+      if(val!==null){ const n=parseFloat((val||'').replace(',','.')); if(!isNaN(n)) await sb.from('accounts').update({ balance:n }).eq('id', a.id); }
+    }
+    await loadSoldiAll();
+    renderPanoramica(); renderConti(); renderBudget(); renderCategorie(); renderMovimenti();
+    alert('✓ Fatto. Movimenti azzerati, buste a zero, saldi conti impostati. Riparti da qui.');
+  }catch(err){ alert('Errore nel reset: '+(err.message||err)); }
+}
+const _resetBtn=$('sol-reset'); if(_resetBtn) _resetBtn.addEventListener('click', resetSoldi);
+
 function renderCategorie(){
   const wrap=$('sol-catlist'); wrap.innerHTML='';
   // speso del mese per categoria (solo uscite)
