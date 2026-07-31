@@ -342,6 +342,7 @@ const MEALS = [['pranzo','Pranzo'],['cena','Cena']];
 
 // quanti giorni mostrare di default (da oggi). Aumenta con "+ Aggiungi giorno".
 let menuDaysCount = 3;
+let menuShowPast = false;
 
 function menuToday(){ return new Date().toISOString().slice(0,10); }
 function menuAddDays(dateStr, n){
@@ -350,15 +351,16 @@ function menuAddDays(dateStr, n){
 }
 
 async function loadMenu(){
-  // carico solo i giorni da oggi in avanti
+  // carico da 7 giorni fa in avanti (i passati si mostrano solo su richiesta)
   const today = menuToday();
   const { data } = await sb.from('menu_entries').select('*')
     .eq('household_id', state.household.id)
-    .gte('entry_date', today).order('entry_date');
+    .gte('entry_date', menuAddDays(today,-7)).order('entry_date');
   casaState.menu = data||[];
-  // se ci sono giorni pianificati oltre i 3 di default, mostrali tutti
-  if(casaState.menu.length){
-    const last = casaState.menu[casaState.menu.length-1].entry_date;
+  // se ci sono giorni pianificati oltre i 3 di default (in avanti), mostrali tutti
+  const future = casaState.menu.filter(m=>m.entry_date>=today);
+  if(future.length){
+    const last = future[future.length-1].entry_date;
     const diff = Math.round((new Date(last+'T12:00:00') - new Date(today+'T12:00:00'))/86400000);
     menuDaysCount = Math.max(menuDaysCount, diff+1);
   }
@@ -370,28 +372,46 @@ function menuDayLabel(dateStr){
   const today=menuToday();
   if(dateStr===today) return 'Oggi';
   if(dateStr===menuAddDays(today,1)) return 'Domani';
+  if(dateStr===menuAddDays(today,-1)) return 'Ieri';
   const d=new Date(dateStr+'T12:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'short'});
   return d.charAt(0).toUpperCase()+d.slice(1);
+}
+
+function menuDayNode(dateStr){
+  const day=document.createElement('div'); day.className='menu-day';
+  let html=`<div class="dh">${menuDayLabel(dateStr)}</div>`;
+  MEALS.forEach(([meal,mlabel])=>{
+    const e=menuEntry(dateStr,meal);
+    const dish = e?.dish ? `<div class="md">${e.dish}${e.variant_note?`<div class="note">${e.variant_note}</div>`:''}</div>` : `<div class="md empty">— tocca per aggiungere —</div>`;
+    html+=`<div class="menu-meal" data-date="${dateStr}" data-meal="${meal}"><span class="mt">${mlabel}</span>${dish}</div>`;
+  });
+  day.innerHTML=html;
+  day.querySelectorAll('.menu-meal').forEach(mm=>{
+    mm.onclick=()=>openMenuModal(mm.dataset.date, mm.dataset.meal);
+  });
+  return day;
 }
 
 function renderMenu(){
   const wrap=$('casa-menu-list'); wrap.innerHTML='';
   const today=menuToday();
-  for(let i=0;i<menuDaysCount;i++){
-    const dateStr=menuAddDays(today,i);
-    const day=document.createElement('div'); day.className='menu-day';
-    let html=`<div class="dh">${menuDayLabel(dateStr)}</div>`;
-    MEALS.forEach(([meal,mlabel])=>{
-      const e=menuEntry(dateStr,meal);
-      const dish = e?.dish ? `<div class="md">${e.dish}${e.variant_note?`<div class="note">${e.variant_note}</div>`:''}</div>` : `<div class="md empty">— tocca per aggiungere —</div>`;
-      html+=`<div class="menu-meal" data-date="${dateStr}" data-meal="${meal}"><span class="mt">${mlabel}</span>${dish}</div>`;
-    });
-    day.innerHTML=html;
-    day.querySelectorAll('.menu-meal').forEach(mm=>{
-      mm.onclick=()=>openMenuModal(mm.dataset.date, mm.dataset.meal);
-    });
-    wrap.appendChild(day);
+  // pulsante / giorni precedenti in cima
+  if(!menuShowPast){
+    const pastBtn=document.createElement('button');
+    pastBtn.className='btn-ghost'; pastBtn.textContent='↑ 7 giorni precedenti';
+    pastBtn.style.marginBottom='8px';
+    pastBtn.onclick=()=>{ menuShowPast=true; renderMenu(); };
+    wrap.appendChild(pastBtn);
+  } else {
+    const hideBtn=document.createElement('button');
+    hideBtn.className='btn-ghost'; hideBtn.textContent='↓ Nascondi giorni precedenti';
+    hideBtn.style.marginBottom='8px';
+    hideBtn.onclick=()=>{ menuShowPast=false; renderMenu(); };
+    wrap.appendChild(hideBtn);
+    for(let i=-7;i<0;i++){ wrap.appendChild(menuDayNode(menuAddDays(today,i))); }
   }
+  // oggi in avanti
+  for(let i=0;i<menuDaysCount;i++){ wrap.appendChild(menuDayNode(menuAddDays(today,i))); }
   // pulsante aggiungi giorno
   const addBtn=document.createElement('button');
   addBtn.className='btn-ghost'; addBtn.id='menu-add-day'; addBtn.textContent='+ Aggiungi giorno';
