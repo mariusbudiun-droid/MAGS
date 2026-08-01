@@ -57,6 +57,20 @@ function magsSort(arr){
 // Helper DOM
 const $ = (id) => document.getElementById(id);
 
+// riprova automatico per chiamate Supabase che falliscono per rete (iPhone in background)
+async function sbRetry(fn, tries=3){
+  let last;
+  for(let i=0;i<tries;i++){
+    try{
+      const res = await fn();
+      if(res && res.error){ last=res.error; }
+      else return res;
+    }catch(err){ last=err; }
+    if(i<tries-1) await new Promise(r=>setTimeout(r, 400*(i+1)));
+  }
+  return { error:last };
+}
+
 // prompt numerico con tastierino (sostituisce prompt() per i numeri)
 function numPrompt(message, defaultVal='', opts){
   opts = opts || {};

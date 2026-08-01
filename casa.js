@@ -59,18 +59,20 @@ function renderItems(items){
       <span class="who">${who?who.display_name:''}</span>
       <button class="del" title="Elimina">×</button>`;
     row.querySelector('.box').onclick=async ()=>{
-      await sb.from('shopping_items').update({ checked: !it.checked }).eq('id', it.id);
-      loadItems();
+      it.checked = !it.checked;               // cambia subito a schermo
+      renderItems(casaState.currentItems);    // ridisegno locale, zero attesa
+      const { error } = await sbRetry(()=>sb.from('shopping_items').update({ checked: it.checked }).eq('id', it.id));
+      if(error){ it.checked = !it.checked; renderItems(casaState.currentItems); alert('Non salvato (rete). Riprova.'); }
     };
     row.querySelector('.nm').onclick=async ()=>{
       const nuovo=prompt('Modifica articolo:', it.name);
       if(nuovo===null) return;
       const v=nuovo.trim(); if(!v){ alert('Il nome non può essere vuoto.'); return; }
-      await sb.from('shopping_items').update({ name:v }).eq('id', it.id);
+      await sbRetry(()=>sb.from('shopping_items').update({ name:v }).eq('id', it.id));
       loadItems();
     };
     row.querySelector('.del').onclick=async ()=>{
-      await sb.from('shopping_items').delete().eq('id', it.id);
+      await sbRetry(()=>sb.from('shopping_items').delete().eq('id', it.id));
       loadItems();
     };
     wrap.appendChild(row);
@@ -84,7 +86,7 @@ function renderItems(items){
     clr.textContent=`Elimina comprati (${checkedCount})`;
     clr.onclick=async ()=>{
       if(!confirm(`Eliminare ${checkedCount} articoli già comprati?`)) return;
-      await sb.from('shopping_items').delete().eq('list_id', casaState.currentList).eq('checked', true);
+      await sbRetry(()=>sb.from('shopping_items').delete().eq('list_id', casaState.currentList).eq('checked', true));
       loadItems();
     };
     wrap.appendChild(clr);
@@ -445,15 +447,17 @@ $('mn-save').addEventListener('click', async ()=>{
   let wd=new Date(dateStr+'T12:00:00').getDay(); wd=wd===0?7:wd;
   const payload = { household_id:state.household.id, entry_date:dateStr, weekday:wd, meal, dish, variant_note:$('mn-note').value.trim()||null };
   let error;
-  if(existing){ ({error}=await sb.from('menu_entries').update(payload).eq('id', existing.id)); }
-  else { ({error}=await sb.from('menu_entries').insert(payload)); }
-  if(error){ showError('mn-error','Errore: '+error.message); return; }
+  try{
+    if(existing){ ({error}=await sbRetry(()=>sb.from('menu_entries').update(payload).eq('id', existing.id))); }
+    else { ({error}=await sbRetry(()=>sb.from('menu_entries').insert(payload))); }
+  }catch(err){ error=err; }
+  if(error){ showError('mn-error','Errore di rete, riprova tra un attimo.'); return; }
   closeMenuModal(); await loadMenu(); renderMenu();
 });
 $('mn-clear').addEventListener('click', async ()=>{
   const { dateStr, meal } = editingMenu;
   const existing = menuEntry(dateStr, meal);
-  if(existing){ await sb.from('menu_entries').delete().eq('id', existing.id); }
+  if(existing){ await sbRetry(()=>sb.from('menu_entries').delete().eq('id', existing.id)); }
   closeMenuModal(); await loadMenu(); renderMenu();
 });
 
