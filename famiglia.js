@@ -220,7 +220,7 @@ async function saveMemberFull(m){
     member_type:g('mf-type').value,
     occupation:g('mf-occ').value,
   };
-  const { error:e1 }=await sb.from('members').update(memberPatch).eq('id',m.id);
+  const { error:e1 }=await sbRetry(()=>sb.from('members').update(memberPatch).eq('id',m.id));
   if(e1){ const e=$('mf-error'); e.textContent='Errore: '+e1.message; e.classList.remove('hidden'); return; }
   // record esteso (contatti + salute + varie)
   const r=(hrRecords&&hrRecords[m.id])||{};
@@ -243,12 +243,12 @@ async function saveMemberFull(m){
     name_day:val('mf-nameday')||null,
     notes:val('mf-notes')||null,
   };
-  if(r&&r.id){ await sb.from('health_records').update(patch).eq('id',r.id); }
-  else { await sb.from('health_records').insert(patch); }
+  if(r&&r.id){ await sbRetry(()=>sb.from('health_records').update(patch).eq('id',r.id)); }
+  else { await sbRetry(()=>sb.from('health_records').insert(patch)); }
   // indirizzo di famiglia (household, condiviso)
   const newAddr=val('mf-address');
   if(newAddr !== ((state.household&&state.household.address)||'')){
-    await sb.from('households').update({ address:newAddr||null }).eq('id', state.household.id);
+    await sbRetry(()=>sb.from('households').update({ address:newAddr||null }).eq('id', state.household.id));
     if(state.household) state.household.address=newAddr||null;
   }
   await reloadMembers();

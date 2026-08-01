@@ -564,9 +564,9 @@ $('ev-save').addEventListener('click', async ()=>{
   const btn=$('ev-save'); btn.disabled=true; btn.textContent='Salvataggio…';
   let error;
   if(editingEventId){
-    ({ error } = await sb.from('events').update(base).eq('id', editingEventId));
+    ({ error } = await sbRetry(()=>sb.from('events').update(base).eq('id', editingEventId)));
   } else {
-    ({ error } = await sb.from('events').insert(base));
+    ({ error } = await sbRetry(()=>sb.from('events').insert(base)));
   }
   btn.disabled=false; btn.textContent='Salva evento';
   if(error){ showError('ev-error','Errore: '+error.message); return; }
@@ -589,8 +589,8 @@ $('ev-delete').addEventListener('click', async ()=>{
     if(serie.length>1){
       const r = confirm(`"${ev.title}" è un periodo su ${serie.length} giorni.\n\nOK = elimina TUTTO il periodo\nAnnulla = elimina solo questo giorno`);
       let error;
-      if(r){ ({error}=await sb.from('events').delete().eq('household_id',state.household.id).eq('member_id',ev.member_id).eq('title',ev.title).eq('source','manuale')); }
-      else { ({error}=await sb.from('events').delete().eq('id', editingEventId)); }
+      if(r){ ({error}=await sbRetry(()=>sb.from('events').delete().eq('household_id',state.household.id).eq('member_id',ev.member_id).eq('title',ev.title).eq('source','manuale'))); }
+      else { ({error}=await sbRetry(()=>sb.from('events').delete().eq('id', editingEventId))); }
       if(error){ showError('ev-error','Errore: '+error.message); return; }
       closeEventModal(); await applyCalView(); return;
     }
@@ -601,7 +601,7 @@ $('ev-delete').addEventListener('click', async ()=>{
   if(ev && endDay && endDay>startDay){
     const r = confirm(`"${ev.title}" dura dal ${startDay} al ${endDay}.\n\nOK = elimina TUTTO l'evento\nAnnulla = togli solo il giorno ${selDay}`);
     if(r){
-      const { error } = await sb.from('events').delete().eq('id', editingEventId);
+      const { error } = await sbRetry(()=>sb.from('events').delete().eq('id', editingEventId));
       if(error){ showError('ev-error','Errore: '+error.message); return; }
     } else {
       // togli solo selDay: accorcia o spezza in due
@@ -611,7 +611,7 @@ $('ev-delete').addEventListener('click', async ()=>{
   }
 
   // CASO C — evento singolo
-  const { error } = await sb.from('events').delete().eq('id', editingEventId);
+  const { error } = await sbRetry(()=>sb.from('events').delete().eq('id', editingEventId));
   if(error){ showError('ev-error','Errore: '+error.message); return; }
   closeEventModal();
   await applyCalView();
@@ -896,7 +896,7 @@ async function saveRoster(){
       .gte('start_at', dt+'T00:00:00').lt('start_at', dt+'T23:59:59');
   }
 
-  const { error } = await sb.from('events').insert(rows);
+  const { error } = await sbRetry(()=>sb.from('events').insert(rows));
   btn.disabled=false; btn.textContent='Aggiungi al calendario';
   if(error){ setRosterStatus('err','Errore nel salvataggio: '+error.message); return; }
 
@@ -1143,7 +1143,7 @@ $('sp-save').addEventListener('click', async ()=>{
       .eq('household_id', state.household.id).eq('member_id', memberId).eq('source','manuale')
       .gte('start_at', ds+'T00:00:00').lt('start_at', ds+'T23:59:59');
   }
-  const { error } = await sb.from('events').insert(rows);
+  const { error } = await sbRetry(()=>sb.from('events').insert(rows));
   btn.dataset.busy='0'; btn.textContent='Salva periodo';
   if(error){ showError('sp-error','Errore: '+error.message); return; }
   $('special-modal').classList.add('hidden');
