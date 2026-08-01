@@ -279,6 +279,7 @@ async function manageBusta(b){
 
     } else { return; }
 
+    await syncBalancesFromLedger();
     await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica(); renderCategorie();
   }catch(err){ alert('Errore: '+(err.message||err)); }
 }
@@ -400,12 +401,10 @@ async function settleBill(b, amount, src){
   const today = new Date().toISOString().slice(0,10);
   if(src.kind==='acc'){
     const acc = soldi.accounts.find(a=>a.id===src.id);
-    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
-    await sb.from('accounts').update({ balance:(+acc.balance||0)-amount }).eq('id', acc.id);
+    await sbRetry(()=>sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_account:acc.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null }));
   } else {
     const bud = soldi.budgets.find(x=>x.id===src.id);
-    await sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null });
-    await sb.from('budgets').update({ balance:(+bud.balance||0)-amount }).eq('id', bud.id);
+    await sbRetry(()=>sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount, from_budget:bud.id, category_id:b.category_id||null, description:`Pagamento ${b.name}`, tx_date:today, member_id:state.me?state.me.id:null }));
   }
   // avanza la scadenza secondo la frequenza (0 = una tantum → disattiva)
   const freq = (b.freq_months!=null) ? b.freq_months : 1;
@@ -415,6 +414,7 @@ async function settleBill(b, amount, src){
   } else if(freq===0){
     await sb.from('recurring_bills').update({ active:false }).eq('id', b.id);
   }
+  await syncBalancesFromLedger();
   await loadSoldiAll();
   renderBollette(); renderConti(); reloadBalances && reloadBalances();
 }
@@ -451,6 +451,63 @@ function renderConti(){
 
 // RICOSTRUZIONE: ricalcola tutti i saldi (conti e buste) sommando le transazioni.
 // Utile per riparare saldi sballati: le transazioni sono la fonte di verità.
+// somma i movimenti per ottenere i saldi di conti e buste
+function computeLedgerBalances(list){
+  const acc={}, bud={};
+  soldi.accounts.forEach(a=>acc[a.id]=0);
+  soldi.budgets.forEach(b=>bud[b.id]=0);
+  (list||[]).forEach(t=>{
+    const amt=+t.amount||0;
+    if(t.kind==='entrata'){
+      if(t.to_budget!=null && bud[t.to_budget]!=null) bud[t.to_budget]+=amt;
+      else if(t.account_id!=null && acc[t.account_id]!=null) acc[t.account_id]+=amt;
+    } else if(t.kind==='uscita'){
+      if(t.from_budget!=null && bud[t.from_budget]!=null) bud[t.from_budget]-=amt;
+      else if(t.account_id!=null && acc[t.account_id]!=null) acc[t.account_id]-=amt;
+    } else if(t.kind==='giroconto'){
+      if(t.from_account!=null && acc[t.from_account]!=null) acc[t.from_account]-=amt;
+      if(t.from_budget!=null && bud[t.from_budget]!=null) bud[t.from_budget]-=amt;
+      if(t.to_account!=null && acc[t.to_account]!=null) acc[t.to_account]+=amt;
+      if(t.to_budget!=null && bud[t.to_budget]!=null) bud[t.to_budget]+=amt;
+    }
+  });
+  return { acc, bud };
+}
+
+// RICALCOLO SILENZIOSO: rifà tutti i saldi dai movimenti. Va chiamato dopo ogni operazione.
+async function syncBalancesFromLedger(){
+  const { data: txs } = await sbRetry(()=>sb.from('transactions').select('*').eq('household_id', state.household.id));
+  const { acc, bud } = computeLedgerBalances(txs);
+  const r=n=>Math.round(n*100)/100;
+  for(const a of soldi.accounts){ await sbRetry(()=>sb.from('accounts').update({ balance:r(acc[a.id]) }).eq('id', a.id)); }
+  for(const b of soldi.budgets){ await sbRetry(()=>sb.from('budgets').update({ balance:r(bud[b.id]) }).eq('id', b.id)); }
+}
+
+// ALLINEAMENTO (una tantum, per la migrazione): crea movimenti che portano i movimenti
+// a ricostruire i saldi ATTUALI. Così passiamo al nuovo modello senza cambiare i tuoi numeri.
+async function allineaSaldi(){
+  if(!confirm('Allineare i movimenti ai saldi attuali?\n\nCrea dei movimenti "Allineamento iniziale" così i saldi diventano ricostruibili dai movimenti, senza cambiare i numeri che vedi ora. Va fatto una volta sola (rifarlo non fa danni).')) return;
+  try{
+    const hid=state.household.id, today=new Date().toISOString().slice(0,10);
+    const { data: txs } = await sbRetry(()=>sb.from('transactions').select('*').eq('household_id', hid));
+    const { acc, bud } = computeLedgerBalances(txs);
+    const r=n=>Math.round(n*100)/100;
+    let n=0;
+    for(const a of soldi.accounts){
+      const diff=r((+a.balance||0) - acc[a.id]);
+      if(diff!==0){ n++; await sbRetry(()=>sb.from('transactions').insert({ household_id:hid, kind:diff>0?'entrata':'uscita', amount:Math.abs(diff), account_id:a.id, description:'Allineamento iniziale', tx_date:today, member_id:state.me?state.me.id:null })); }
+    }
+    for(const b of soldi.budgets){
+      const diff=r((+b.balance||0) - bud[b.id]);
+      if(diff!==0){ n++; const tx={ household_id:hid, kind:diff>0?'entrata':'uscita', amount:Math.abs(diff), description:'Allineamento iniziale', tx_date:today, member_id:state.me?state.me.id:null }; tx[diff>0?'to_budget':'from_budget']=b.id; await sbRetry(()=>sb.from('transactions').insert(tx)); }
+    }
+    await syncBalancesFromLedger();
+    await loadSoldiAll(); renderPanoramica(); renderConti(); renderBudget(); renderCategorie();
+    alert(n?`✓ Allineati ${n} saldi. Da ora i movimenti sono la verità.`:'✓ Saldi già allineati ai movimenti.');
+  }catch(err){ alert('Errore allineamento: '+(err.message||err)); }
+}
+const _allineaBtn=$('sol-allinea'); if(_allineaBtn) _allineaBtn.addEventListener('click', allineaSaldi);
+
 async function recalcAllBalances(){
   const accSum={}; const budSum={};
   soldi.accounts.forEach(a=>accSum[a.id]=0);
@@ -492,13 +549,26 @@ async function resetSoldi(){
   if(!confirm('⚠️ AZZERARE tutti i movimenti?\n\nCancella TUTTE le transazioni (entrate, uscite, giroconti) e azzera le buste. Restano conti, buste, categorie e scadenze.\n\nQuesta azione NON si può annullare.')) return;
   if(!confirm('Ultima conferma: vuoi davvero cancellare tutti i movimenti e ripartire da zero?')) return;
   try{
-    await sb.from('transactions').delete().eq('household_id', state.household.id);
-    for(const b of soldi.budgets){ await sb.from('budgets').update({ balance:0 }).eq('id', b.id); }
+    const hid=state.household.id;
+    const today=new Date().toISOString().slice(0,10);
+    // chiedo prima i saldi reali dei conti (così se annulli non ho ancora cancellato nulla)
+    const iniziali=[];
     for(const a of soldi.accounts){
       const cur=+a.balance||0;
       const val=await numPrompt(`Saldo reale attuale di "${a.name}"? (€)\nSe è già giusto lascia il valore, altrimenti correggilo.`, String(cur));
-      if(val!==null){ const n=parseFloat((val||'').replace(',','.')); if(!isNaN(n)) await sb.from('accounts').update({ balance:n }).eq('id', a.id); }
+      if(val===null) return; // annullato: non tocco niente
+      const n=parseFloat((val||'').replace(',','.'));
+      iniziali.push({ acc:a, val: isNaN(n)?0:n });
     }
+    // cancella tutti i movimenti
+    await sbRetry(()=>sb.from('transactions').delete().eq('household_id', hid));
+    // registra un movimento di "saldo iniziale" per ogni conto (così il ricalcolo trova da dove parte)
+    for(const it of iniziali){
+      if(it.val>0){ await sbRetry(()=>sb.from('transactions').insert({ household_id:hid, kind:'entrata', amount:it.val, account_id:it.acc.id, description:'Saldo iniziale', tx_date:today, member_id:state.me?state.me.id:null })); }
+      else if(it.val<0){ await sbRetry(()=>sb.from('transactions').insert({ household_id:hid, kind:'uscita', amount:Math.abs(it.val), account_id:it.acc.id, description:'Saldo iniziale', tx_date:today, member_id:state.me?state.me.id:null })); }
+    }
+    // ricalcola tutto dai movimenti: conti = saldo iniziale, buste = 0
+    await syncBalancesFromLedger();
     await loadSoldiAll();
     renderPanoramica(); renderConti(); renderBudget(); renderCategorie(); renderMovimenti();
     alert('✓ Fatto. Movimenti azzerati, buste a zero, saldi conti impostati. Riparti da qui.');
@@ -663,7 +733,8 @@ $('tx-delete').addEventListener('click', async ()=>{
   const tx=soldi.transactions.find(t=>t.id===editingTx);
   try{
     if(tx) await revertTxEffect(tx);
-    await sb.from('transactions').delete().eq('id', editingTx);
+    await sbRetry(()=>sb.from('transactions').delete().eq('id', editingTx));
+    await syncBalancesFromLedger();
     $('tx-modal').classList.add('hidden');
     await openSoldi();
   }catch(err){ showError('tx-error','Errore: '+(err.message||err)); }
@@ -702,8 +773,8 @@ $('tx-save').addEventListener('click', async ()=>{
       // se è una busta, salvo il riferimento nel campo budget appropriato
       if(isBud){ if(kind==='uscita') payload.from_budget=selId; else payload.to_budget=selId; }
       let error;
-      if(editingTx){ ({error}=await sb.from('transactions').update(payload).eq('id', editingTx)); }
-      else { ({error}=await sb.from('transactions').insert(payload)); }
+      if(editingTx){ ({error}=await sbRetry(()=>sb.from('transactions').update(payload).eq('id', editingTx))); }
+      else { ({error}=await sbRetry(()=>sb.from('transactions').insert(payload))); }
       if(error) throw error;
       // ricarico i saldi freschi (il revert ha già aggiornato il DB)
       if(editingTx){ await reloadBalances(); }
@@ -723,6 +794,7 @@ $('tx-save').addEventListener('click', async ()=>{
         }
       }
     }
+    await syncBalancesFromLedger();
     $('tx-modal').classList.add('hidden');
     await openSoldi();
   }catch(err){
@@ -874,6 +946,7 @@ $('budget-save').addEventListener('click', async ()=>{
       });
     }
     $('budget-modal').classList.add('hidden');
+    await syncBalancesFromLedger();
     await loadSoldiAll(); renderBudget(); renderConti(); renderPanoramica(); renderCategorie();
   }catch(err){ showError('budget-error','Errore: '+(err.message||err)); }
 });
