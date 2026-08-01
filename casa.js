@@ -146,6 +146,22 @@ async function shareShoppingList(){
 }
 const _shareBtn=$('spesa-share'); if(_shareBtn) _shareBtn.addEventListener('click', shareShoppingList);
 
+// ---- elimina lista corrente (con i suoi articoli) ----
+async function deleteCurrentList(){
+  if(!casaState.currentList){ alert('Nessuna lista selezionata.'); return; }
+  const lista=(casaState.lists||[]).find(l=>l.id===casaState.currentList);
+  const nome=lista?lista.name:'questa lista';
+  if(!confirm(`Eliminare la lista "${nome}" e tutti i suoi articoli?\n\nNon si può annullare.`)) return;
+  try{
+    await sbRetry(()=>sb.from('shopping_items').delete().eq('list_id', casaState.currentList));
+    const { error }=await sbRetry(()=>sb.from('shopping_lists').delete().eq('id', casaState.currentList));
+    if(error){ alert('Errore: '+(error.message||error)); return; }
+    casaState.currentList=null;
+    await loadLists();
+  }catch(err){ alert('Errore: '+(err.message||err)); }
+}
+const _delListBtn=$('spesa-dellist'); if(_delListBtn) _delListBtn.addEventListener('click', deleteCurrentList);
+
 // ---- impostazioni lista: busta (categoria) + conto (solo se no busta) ----
 async function openListConfig(){
   if(!casaState.currentList){ return; }
