@@ -57,6 +57,22 @@ function magsSort(arr){
 // Helper DOM
 const $ = (id) => document.getElementById(id);
 
+// crea un file e apre il menù iOS per salvarlo/condividerlo (fallback: download)
+async function downloadFile(filename, content, mime){
+  const blob = new Blob([content], { type: mime });
+  try{
+    const file = new File([blob], filename, { type: mime });
+    if(navigator.canShare && navigator.canShare({ files:[file] })){
+      await navigator.share({ files:[file], title: filename });
+      return;
+    }
+  }catch(err){ if(err && err.name==='AbortError') return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+
 // riprova automatico per chiamate Supabase che falliscono per rete (iPhone in background)
 async function sbRetry(fn, tries=3){
   let last;

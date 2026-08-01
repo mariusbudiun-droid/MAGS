@@ -506,6 +506,28 @@ async function resetSoldi(){
 }
 const _resetBtn=$('sol-reset'); if(_resetBtn) _resetBtn.addEventListener('click', resetSoldi);
 
+// ESPORTA BACKUP: legge tutte le tabelle dei soldi e crea un file JSON completo.
+// Non modifica nulla: è solo una copia di sicurezza.
+async function exportBackup(){
+  const btn=$('sol-export'); const orig=btn?btn.textContent:'';
+  if(btn){ btn.textContent='Preparo il backup…'; btn.disabled=true; }
+  try{
+    const hid=state.household.id;
+    const tables=['accounts','budgets','categories','transactions','recurring_bills'];
+    const backup={ app:'MAGS', tipo:'backup-soldi', versione:(typeof MAGS_CONFIG!=='undefined'?MAGS_CONFIG.APP_VERSION:''), esportato:new Date().toISOString(), household_id:hid, dati:{} };
+    for(const t of tables){
+      const { data, error }=await sbRetry(()=>sb.from(t).select('*').eq('household_id', hid));
+      if(error) throw error;
+      backup.dati[t]=data||[];
+    }
+    const json=JSON.stringify(backup, null, 2);
+    const oggi=new Date().toISOString().slice(0,10);
+    await downloadFile(`mags-backup-${oggi}.json`, json, 'application/json');
+  }catch(err){ alert('Errore export: '+(err.message||err)); }
+  finally{ if(btn){ btn.textContent=orig; btn.disabled=false; } }
+}
+const _exportBtn=$('sol-export'); if(_exportBtn) _exportBtn.addEventListener('click', exportBackup);
+
 function renderCategorie(){
   const wrap=$('sol-catlist'); wrap.innerHTML='';
   // speso del mese per categoria (solo uscite)
