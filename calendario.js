@@ -858,6 +858,7 @@ async function saveRoster(){
     }
     else if(d.type==='al'){ duty_type='ferie'; }
     else if(d.type==='off'){ duty_type='off'; }
+    else if(['pl','ul','vto'].includes(d.type)){ duty_type='off'; } // Permesso/VTO = giorno libero (verde come riposo)
     else { duty_type=d.type||'duty'; }
     // per i voli: inizio = check-in (CI), fine = check-out (CO)
     let sTime = t.start, eTime = t.end;
