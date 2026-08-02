@@ -699,7 +699,7 @@ async function exportCalendarICS(){
       out+='END:VEVENT\r\n';
     });
     out+='END:VCALENDAR\r\n';
-    await downloadFile('mags-calendario.ics', out, 'text/calendar');
+    openICS(out);
   }catch(err){ alert('Errore export: '+(err.message||err)); }
   finally{ if(btn){ btn.textContent=orig; btn.disabled=false; } }
 }

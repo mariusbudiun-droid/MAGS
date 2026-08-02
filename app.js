@@ -57,6 +57,16 @@ function magsSort(arr){
 // Helper DOM
 const $ = (id) => document.getElementById(id);
 
+// apre un .ics direttamente: iOS mostra "Aggiungi al Calendario" invece di salvare il file
+function openICS(content){
+  const blob = new Blob([content], { type:'text/calendar' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.target = '_blank'; a.rel = 'noopener';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+
 // crea un file e apre il menù iOS per salvarlo/condividerlo (fallback: download)
 async function downloadFile(filename, content, mime){
   const blob = new Blob([content], { type: mime });
