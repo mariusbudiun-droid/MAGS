@@ -652,58 +652,6 @@ async function splitMultiDay(ev, dayStr){
 // ============================================================
 // SUBNAV calendario (Agenda / Voli) + IMPORT ROSTER
 // ============================================================
-// ===== Esporta calendario in .ics (tutta la famiglia, da oggi in poi) =====
-function icsEsc(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
-function icsDT(iso){ return (iso||'').replace(/[-:]/g,'').slice(0,15); } // 20260802T055000 (ora locale)
-function icsDATE(iso){ return (iso||'').slice(0,10).replace(/-/g,''); }   // 20260802
-function icsNextDay(dstr){ const d=new Date((dstr||'').slice(0,10)+'T12:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10).replace(/-/g,''); }
-function icsPlusHour(iso){ const d=new Date(iso); d.setHours(d.getHours()+1); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}T${p(d.getHours())}${p(d.getMinutes())}00`; }
-
-async function exportCalendarICS(){
-  const btn=$('cal-export'); const orig=btn?btn.textContent:'';
-  if(btn){ btn.textContent='Preparo il file…'; btn.disabled=true; }
-  try{
-    const today=new Date().toISOString().slice(0,10);
-    const { data } = await sbRetry(()=>sb.from('events').select('*')
-      .eq('household_id', state.household.id)
-      .gte('start_at', today+'T00:00:00').order('start_at'));
-    const events=data||[];
-    if(!events.length){ alert('Nessun evento da esportare (da oggi in poi).'); return; }
-    const nameOf=id=>{ const m=state.members.find(x=>x.id===id); return m?m.display_name:''; };
-    const stampUTC=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
-    let out='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//MAGS//Famiglia//IT\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nX-WR-CALNAME:MAGS Famiglia\r\n';
-    events.forEach(e=>{
-      const nm=nameOf(e.member_id);
-      const summary=(nm?nm+' – ':'')+(e.title||'Evento');
-      // CI/CO dai voli (nella nota)
-      let ci='',co='';
-      if(e.note){ const mm=e.note.match(/CI:\s*([0-9:—]+)\s+CO:\s*([0-9:—]+)/); if(mm){ ci=mm[1]; co=mm[2]; } }
-      const descParts=[];
-      if(CAT_LABELS[e.category]) descParts.push(CAT_LABELS[e.category]);
-      if(ci||co) descParts.push(`CI ${ci||'—'} · CO ${co||'—'}`);
-      if(e.note && !(ci||co)) descParts.push(e.note);
-      const desc=descParts.join(' · ');
-      out+='BEGIN:VEVENT\r\n';
-      out+='UID:'+(e.id||Math.random().toString(36).slice(2))+'@mags\r\n';
-      out+='DTSTAMP:'+stampUTC+'\r\n';
-      if(e.all_day){
-        out+='DTSTART;VALUE=DATE:'+icsDATE(e.start_at)+'\r\n';
-        out+='DTEND;VALUE=DATE:'+icsNextDay(e.end_at||e.start_at)+'\r\n';
-      } else {
-        out+='DTSTART:'+icsDT(e.start_at)+'\r\n';
-        out+='DTEND:'+(e.end_at?icsDT(e.end_at):icsPlusHour(e.start_at))+'\r\n';
-      }
-      out+='SUMMARY:'+icsEsc(summary)+'\r\n';
-      if(e.location) out+='LOCATION:'+icsEsc(e.location)+'\r\n';
-      if(desc) out+='DESCRIPTION:'+icsEsc(desc)+'\r\n';
-      out+='END:VEVENT\r\n';
-    });
-    out+='END:VCALENDAR\r\n';
-    await downloadFile('mags-calendario.ics', out, 'text/calendar');
-  }catch(err){ alert('Errore export: '+(err.message||err)); }
-  finally{ if(btn){ btn.textContent=orig; btn.disabled=false; } }
-}
-const _calExport=$('cal-export'); if(_calExport) _calExport.addEventListener('click', exportCalendarICS);
 
 document.querySelectorAll('#cal-subnav .s').forEach(s=>{
   s.addEventListener('click', ()=>{
