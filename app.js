@@ -583,10 +583,16 @@ async function loadHomeExtras(){
   const { data: evsRaw } = await sb.from('events')
     .select('*').eq('household_id', state.household.id)
     .gte('start_at', wide+'T00:00:00').order('start_at');
-  // tieni quelli che non sono ancora finiti (oggi <= fine), poi i primi 3
+  // tieni quelli che non sono ancora finiti (oggi <= fine), accorpa i ripetuti (multi-giorno), poi i primi 3
+  const seenEv=new Set();
   const evs = (evsRaw||[]).filter(e=>{
     const d1=(e.end_at||'').slice(0,10) || (e.start_at||'').slice(0,10);
     return d1>=today;
+  }).filter(e=>{
+    const who = e.member_id || (Array.isArray(e.member_ids)?e.member_ids.join(','):'');
+    const key = (e.title||'')+'|'+who+'|'+(e.all_day?'1':'0');
+    if(seenEv.has(key)) return false;
+    seenEv.add(key); return true;
   }).slice(0,3);
   const aw=$('home-agenda');
   if(aw){
